@@ -1,0 +1,1502 @@
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { SplitText } from 'gsap/SplitText'
+import Lenis from 'lenis'
+import 'lenis/dist/lenis.css'
+import './animations.css'
+
+const lenis = new Lenis({
+  autoRaf: false,
+  lerp: 0.12,
+  wheelMultiplier: 0.6,
+  allowNestedScroll: true,
+})
+
+gsap.registerPlugin(ScrollTrigger, SplitText)
+
+lenis.on('scroll', ScrollTrigger.update)
+
+gsap.ticker.add((time) => {
+  lenis.raf(time * 1000)
+})
+gsap.ticker.lagSmoothing(0)
+
+ScrollTrigger.scrollerProxy(document.documentElement, {
+  scrollTop(value) {
+    if (arguments.length) {
+      lenis.scrollTo(value, { immediate: true })
+    }
+    return lenis.scroll
+  },
+  getBoundingClientRect() {
+    return {
+      top: 0,
+      left: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }
+  },
+})
+
+ScrollTrigger.addEventListener('refresh', () => {
+  lenis.resize()
+})
+
+
+function initSectionBodyColors() {
+  const sections = document.querySelectorAll('[data-color]')
+  if (!sections.length) return
+
+  const setBodyColor = (hex) => {
+    gsap.to(document.body, {
+      backgroundColor: hex,
+      duration: 0.6,
+      ease: 'power2.out',
+      overwrite: 'auto',
+    })
+  }
+
+  const firstColor = sections[0].dataset.color
+  if (firstColor) gsap.set(document.body, { backgroundColor: firstColor })
+
+  sections.forEach((section) => {
+    const color = section.dataset.color
+    if (!color) return
+
+    ScrollTrigger.create({
+      trigger: section,
+      start: 'top 40%',
+      end: 'bottom 45%',
+      onEnter: () => setBodyColor(color),
+      onEnterBack: () => setBodyColor(color),
+    })
+  })
+}
+
+function initHeroEntrance() {
+  const hero = document.querySelector('.section__hero')
+  if (!hero) return
+
+  const headline = hero.querySelector('.headline-jumbo')
+  const subcopy = hero.querySelector('.hero-content p')
+  const buttons = hero.querySelectorAll('.button')
+
+  if (!headline) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  if (reducedMotion) {
+    hero.classList.add('is-hero-ready', 'is-hero-animated')
+    gsap.set([headline, subcopy, ...buttons].filter(Boolean), { clearProps: 'all' })
+    return
+  }
+
+  let headlineSplit = null
+  let subcopySplit = null
+
+  const playEntrance = () => {
+    headlineSplit?.revert()
+    subcopySplit?.revert()
+
+    headlineSplit = SplitText.create(headline, {
+      type: 'lines',
+      mask: 'lines',
+      linesClass: 'split-line',
+    })
+
+    gsap.set(headlineSplit.lines, {
+      yPercent: 108,
+      opacity: 0,
+      filter: 'blur(10px)',
+    })
+
+    if (subcopy) {
+      subcopySplit = SplitText.create(subcopy, {
+        type: 'lines',
+        mask: 'lines',
+        linesClass: 'split-line',
+      })
+
+      gsap.set(subcopySplit.lines, { yPercent: 100, opacity: 0 })
+    }
+
+    if (buttons.length) {
+      gsap.set(buttons, { y: 28, opacity: 0 })
+    }
+
+    hero.classList.add('is-hero-ready')
+
+    const tl = gsap.timeline({
+      defaults: { ease: 'power4.out' },
+      delay: 0.15,
+    })
+
+    tl.to(
+      headlineSplit.lines,
+      {
+        yPercent: 0,
+        opacity: 1,
+        filter: 'blur(0px)',
+        duration: 1.15,
+        stagger: 0.11,
+        ease: 'power4.out',
+      },
+      0,
+    )
+
+    if (subcopySplit?.lines?.length) {
+      tl.to(
+        subcopySplit.lines,
+        {
+          yPercent: 0,
+          opacity: 1,
+          duration: 0.95,
+          stagger: 0.06,
+          ease: 'power3.out',
+        },
+        0.42,
+      )
+    } else if (subcopy) {
+      gsap.set(subcopy, { y: 20, opacity: 0 })
+      tl.to(
+        subcopy,
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.9,
+          ease: 'power3.out',
+        },
+        0.42,
+      )
+    }
+
+    if (buttons.length) {
+      tl.to(
+        buttons,
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.8,
+          stagger: 0.05,
+          ease: 'power3.out',
+        },
+        subcopy || subcopySplit ? 0.72 : 0.55,
+      )
+    }
+
+    hero.classList.add('is-hero-animated')
+  }
+
+  playEntrance()
+}
+
+function getSplitSectionElements(section) {
+  if (section.classList.contains('section__split-chart')) {
+    return {
+      image: section.querySelector('.chart-bar_w'),
+      eyebrow: null,
+      headline: section.querySelector('.split-chart-c .gap-1 h2'),
+      body: section.querySelector('.split-chart-c .gap-1 > p'),
+      button: null,
+      imageFromRight: true,
+    }
+  }
+
+  return {
+    image: section.querySelector('.split-image'),
+    eyebrow: section.querySelector('.split-content__c .paragraph-large'),
+    headline: section.querySelector('.split-content__c .headline-4'),
+    body: section.querySelector('.split-content__c > p'),
+    button: section.querySelector('.split-content__c .button'),
+    imageFromRight: section.getAttribute('data-wf--split-image--variant') === 'right',
+  }
+}
+
+function initSplitSections() {
+  const sections = document.querySelectorAll('.section__split, .section__split-chart')
+  if (!sections.length) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  sections.forEach((section) => {
+    const { image, eyebrow, headline, body, button, imageFromRight } =
+      getSplitSectionElements(section)
+
+    if (!headline) return
+
+    if (reducedMotion) {
+      section.classList.add('is-split-ready', 'is-split-animated')
+      return
+    }
+
+    let headlineSplit = null
+    let bodySplit = null
+    let timeline = null
+
+    headlineSplit = SplitText.create(headline, {
+      type: 'lines',
+      mask: 'lines',
+      linesClass: 'split-line',
+    })
+
+    if (body) {
+      bodySplit = SplitText.create(body, {
+        type: 'lines',
+        mask: 'lines',
+        linesClass: 'split-line',
+      })
+    }
+
+    section.classList.add('is-split-ready')
+
+    const animTargets = [
+      ...(headlineSplit?.lines || []),
+      ...(bodySplit?.lines || []),
+      eyebrow,
+      button,
+      image,
+    ].filter(Boolean)
+
+    const setOut = () => {
+      gsap.killTweensOf(animTargets)
+      timeline?.kill()
+
+      gsap.set(headlineSplit.lines, {
+        yPercent: 108,
+        opacity: 0,
+        filter: 'blur(10px)',
+      })
+
+      if (bodySplit?.lines?.length) {
+        gsap.set(bodySplit.lines, { yPercent: 100, opacity: 0 })
+      }
+
+      if (eyebrow) gsap.set(eyebrow, { y: 16, opacity: 0 })
+      if (button) gsap.set(button, { y: 28, opacity: 0 })
+      if (image) {
+        gsap.set(image, {
+          x: imageFromRight ? 72 : -72,
+          opacity: 0,
+          scale: 1.04,
+        })
+      }
+
+      section.classList.remove('is-split-animated')
+    }
+
+    const playIn = () => {
+      timeline?.kill()
+      setOut()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power4.out' },
+      })
+
+      if (image) {
+        timeline.to(
+          image,
+          {
+            x: 0,
+            opacity: 1,
+            scale: 1,
+            duration: 1.15,
+            ease: 'power4.out',
+          },
+          0,
+        )
+      }
+
+      if (eyebrow) {
+        timeline.to(
+          eyebrow,
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.75,
+            ease: 'power3.out',
+          },
+          image ? 0.18 : 0,
+        )
+      }
+
+      timeline.to(
+        headlineSplit.lines,
+        {
+          yPercent: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: 1.15,
+          stagger: 0.11,
+          ease: 'power4.out',
+        },
+        image ? 0.28 : 0.12,
+      )
+
+      if (bodySplit?.lines?.length) {
+        timeline.to(
+          bodySplit.lines,
+          {
+            yPercent: 0,
+            opacity: 1,
+            duration: 0.95,
+            stagger: 0.06,
+            ease: 'power3.out',
+          },
+          image ? 0.5 : 0.38,
+        )
+      }
+
+      if (button) {
+        timeline.to(
+          button,
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.8,
+            ease: 'power3.out',
+          },
+          image ? 0.72 : 0.58,
+        )
+      }
+
+      section.classList.add('is-split-animated')
+    }
+
+    const playOut = () => {
+      timeline?.kill()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power2.in' },
+        onComplete: setOut,
+      })
+
+      timeline.to(animTargets, {
+        opacity: 0,
+        duration: 0.45,
+        stagger: 0.03,
+        ease: 'power2.in',
+      })
+    }
+
+    setOut()
+
+    const trigger = ScrollTrigger.create({
+      trigger: section,
+      start: 'top 78%',
+      end: 'bottom 22%',
+      onEnter: playIn,
+      onEnterBack: playIn,
+      onLeave: playOut,
+      onLeaveBack: playOut,
+    })
+
+    ScrollTrigger.addEventListener('refresh', () => {
+      if (trigger.isActive) playIn()
+      else setOut()
+    })
+
+    if (trigger.isActive) playIn()
+  })
+}
+
+const playedDonutCharts = new WeakSet()
+
+function playDonutChart(chartEl) {
+  if (!chartEl || playedDonutCharts.has(chartEl)) return
+  playedDonutCharts.add(chartEl)
+  chartEl.dispatchEvent(
+    new CustomEvent('molten-donut:play', { bubbles: true, composed: true }),
+  )
+}
+
+function scheduleDonutPlay(gridItem, delay) {
+  gsap.delayedCall(delay, () => {
+    const existing = gridItem.querySelector('[data-molten-donut]')
+    if (existing) {
+      playDonutChart(existing)
+      return
+    }
+
+    const observer = new MutationObserver(() => {
+      const chartEl = gridItem.querySelector('[data-molten-donut]')
+      if (!chartEl) return
+      observer.disconnect()
+      playDonutChart(chartEl)
+    })
+
+    observer.observe(gridItem, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-molten-donut'],
+    })
+  })
+}
+
+function initChartSections() {
+  const sections = document.querySelectorAll('.section__chart')
+  if (!sections.length) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  sections.forEach((section) => {
+    const headline = section.querySelector('.gap-1 h2')
+    const body = section.querySelector('.gap-1 p')
+    const gridItems = section.querySelectorAll('.chart-grid > .card-w')
+
+    if (!headline) return
+
+    if (reducedMotion) {
+      section.classList.add('is-chart-ready', 'is-chart-animated')
+      gridItems.forEach((item) => scheduleDonutPlay(item, 0))
+      return
+    }
+
+    let headlineSplit = null
+    let bodySplit = null
+    let timeline = null
+    let donutsIntroPlayed = false
+
+    headlineSplit = SplitText.create(headline, {
+      type: 'lines',
+      mask: 'lines',
+      linesClass: 'split-line',
+    })
+
+    if (body) {
+      bodySplit = SplitText.create(body, {
+        type: 'lines',
+        mask: 'lines',
+        linesClass: 'split-line',
+      })
+    }
+
+    section.classList.add('is-chart-ready')
+
+    const animTargets = [
+      ...(headlineSplit?.lines || []),
+      ...(bodySplit?.lines || []),
+      ...gridItems,
+    ].filter(Boolean)
+
+    const setOut = () => {
+      gsap.killTweensOf(animTargets)
+      timeline?.kill()
+
+      gsap.set(headlineSplit.lines, {
+        yPercent: 108,
+        opacity: 0,
+        filter: 'blur(10px)',
+      })
+
+      if (bodySplit?.lines?.length) {
+        gsap.set(bodySplit.lines, { yPercent: 100, opacity: 0 })
+      }
+
+      if (gridItems.length) {
+        gsap.set(gridItems, {
+          y: 56,
+          opacity: 0,
+          scale: 1.04,
+        })
+      }
+
+      section.classList.remove('is-chart-animated')
+    }
+
+    const playIn = () => {
+      timeline?.kill()
+      setOut()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power4.out' },
+      })
+
+      timeline.to(
+        headlineSplit.lines,
+        {
+          yPercent: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: 1.15,
+          stagger: 0.11,
+          ease: 'power4.out',
+        },
+        0,
+      )
+
+      if (bodySplit?.lines?.length) {
+        timeline.to(
+          bodySplit.lines,
+          {
+            yPercent: 0,
+            opacity: 1,
+            duration: 0.95,
+            stagger: 0.06,
+            ease: 'power3.out',
+          },
+          0.28,
+        )
+      }
+
+      if (gridItems.length) {
+        timeline.to(
+          gridItems,
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            duration: 1.15,
+            stagger: 0.25,
+            ease: 'power4.out',
+          },
+          0.42,
+        )
+      }
+
+      if (!donutsIntroPlayed && gridItems.length) {
+        donutsIntroPlayed = true
+        gridItems.forEach((item, i) => {
+          scheduleDonutPlay(item, 0.42 + i * 0.25)
+        })
+      }
+
+      section.classList.add('is-chart-animated')
+    }
+
+    const playOut = () => {
+      timeline?.kill()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power2.in' },
+        onComplete: setOut,
+      })
+
+      timeline.to(animTargets, {
+        opacity: 0,
+        duration: 0.45,
+        stagger: 0.03,
+        ease: 'power2.in',
+      })
+    }
+
+    setOut()
+
+    const trigger = ScrollTrigger.create({
+      trigger: section,
+      start: 'top 78%',
+      end: 'bottom 22%',
+      onEnter: playIn,
+      onEnterBack: playIn,
+      onLeave: playOut,
+      onLeaveBack: playOut,
+    })
+
+    ScrollTrigger.addEventListener('refresh', () => {
+      if (trigger.isActive) playIn()
+      else setOut()
+    })
+
+    if (trigger.isActive) playIn()
+  })
+}
+
+function initCardPopups() {
+  const cardPopups = new WeakMap()
+  const popupToCard = new WeakMap()
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  document.querySelectorAll('.card-w').forEach((card) => {
+    const popupWrap = card.querySelector('.popup-w')
+    if (!popupWrap) return
+    cardPopups.set(card, popupWrap)
+    popupToCard.set(popupWrap, card)
+
+    const scrollArea = popupWrap.querySelector('.popup-c')
+    if (scrollArea) {
+      scrollArea.setAttribute('data-lenis-prevent', '')
+      scrollArea.setAttribute('data-lenis-prevent-touch', '')
+    }
+  })
+
+  let activePopup = null
+  let popupTimeline = null
+  let isClosing = false
+
+  const panelVisible = {
+    y: 0,
+    opacity: 1,
+    scale: 1,
+    filter: 'blur(0px)',
+  }
+
+  const panelHidden = {
+    y: 56,
+    opacity: 0,
+    scale: 0.96,
+    filter: 'blur(14px)',
+  }
+
+  const setScrollLocked = (locked) => {
+    document.documentElement.classList.toggle('is-popup-open', locked)
+    if (locked) lenis.stop()
+    else lenis.start()
+  }
+
+  const portalPopup = (popupWrap) => {
+    if (popupWrap.parentElement === document.body) return
+    document.body.appendChild(popupWrap)
+    popupWrap.dataset.portaled = 'true'
+  }
+
+  const unportalPopup = (popupWrap) => {
+    if (popupWrap.parentElement !== document.body) return
+    const card = popupToCard.get(popupWrap)
+    if (card) card.appendChild(popupWrap)
+    delete popupWrap.dataset.portaled
+  }
+
+  const resetPopupStyles = (popupWrap) => {
+    const panel = popupWrap.querySelector('.popup')
+    gsap.set([popupWrap, panel].filter(Boolean), { clearProps: 'all' })
+  }
+
+  const finishClose = (popupWrap, onComplete) => {
+    resetPopupStyles(popupWrap)
+    popupWrap.style.display = 'none'
+    unportalPopup(popupWrap)
+    activePopup = null
+    isClosing = false
+    setScrollLocked(false)
+    onComplete?.()
+  }
+
+  const closePopup = (popupWrap, onComplete) => {
+    if (!popupWrap || popupWrap !== activePopup) {
+      onComplete?.()
+      return
+    }
+    if (isClosing) return
+
+    popupTimeline?.kill()
+    const panel = popupWrap.querySelector('.popup')
+
+    if (!panel || reducedMotion) {
+      finishClose(popupWrap, onComplete)
+      return
+    }
+
+    isClosing = true
+
+    popupTimeline = gsap.timeline({
+      defaults: { ease: 'power3.in' },
+      onComplete: () => finishClose(popupWrap, onComplete),
+    })
+
+    popupTimeline
+      .to(
+        panel,
+        {
+          ...panelHidden,
+          duration: 0.42,
+        },
+        0,
+      )
+      .to(
+        popupWrap,
+        {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          duration: 0.38,
+          ease: 'power2.in',
+        },
+        0.06,
+      )
+  }
+
+  const openPopup = (popupWrap) => {
+    if (activePopup === popupWrap) return
+
+    if (activePopup && activePopup !== popupWrap) {
+      closePopup(activePopup, () => openPopup(popupWrap))
+      return
+    }
+
+    portalPopup(popupWrap)
+    popupWrap.style.display = 'flex'
+    activePopup = popupWrap
+    setScrollLocked(true)
+
+    const panel = popupWrap.querySelector('.popup')
+    popupTimeline?.kill()
+
+    if (!panel || reducedMotion) {
+      gsap.set(popupWrap, { backgroundColor: 'rgba(0, 0, 0, 0.35)' })
+      gsap.set(panel, panelVisible)
+      return
+    }
+
+    gsap.set(popupWrap, { backgroundColor: 'rgba(0, 0, 0, 0)' })
+    gsap.set(panel, panelHidden)
+
+    popupTimeline = gsap.timeline({ defaults: { ease: 'power3.out' } })
+
+    popupTimeline
+      .to(
+        popupWrap,
+        {
+          backgroundColor: 'rgba(0, 0, 0, 0.35)',
+          duration: 0.55,
+          ease: 'power2.out',
+        },
+        0,
+      )
+      .to(
+        panel,
+        {
+          ...panelVisible,
+          duration: 0.7,
+        },
+        0.1,
+      )
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('.card-link')
+    if (link) {
+      event.preventDefault()
+      const card = link.closest('.card-w')
+      const popupWrap = card ? cardPopups.get(card) : null
+      if (popupWrap) openPopup(popupWrap)
+      return
+    }
+
+    if (event.target.closest('.popup-btn_close')) {
+      closePopup(event.target.closest('.popup-w'))
+      return
+    }
+
+    const popupWrap = event.target.closest('.popup-w')
+    if (popupWrap && event.target === popupWrap) closePopup(popupWrap)
+  })
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closePopup(activePopup)
+  })
+}
+
+function initDownloadsSection() {
+  const sections = document.querySelectorAll('.section__downloads')
+  if (!sections.length) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  sections.forEach((section) => {
+    const headline = section.querySelector('.gap-1 h2')
+    const links = section.querySelectorAll('.download-link')
+
+    if (!headline) return
+
+    if (reducedMotion) {
+      section.classList.add('is-downloads-ready', 'is-downloads-animated')
+      return
+    }
+
+    let headlineSplit = null
+    let timeline = null
+
+    headlineSplit = SplitText.create(headline, {
+      type: 'lines',
+      mask: 'lines',
+      linesClass: 'split-line',
+    })
+
+    section.classList.add('is-downloads-ready')
+
+    const animTargets = [...(headlineSplit?.lines || []), ...links].filter(Boolean)
+
+    const setOut = () => {
+      gsap.killTweensOf(animTargets)
+      timeline?.kill()
+
+      gsap.set(headlineSplit.lines, {
+        yPercent: 108,
+        opacity: 0,
+        filter: 'blur(10px)',
+      })
+
+      if (links.length) {
+        gsap.set(links, {
+          y: 56,
+          opacity: 0,
+          scale: 1.04,
+        })
+      }
+
+      section.classList.remove('is-downloads-animated')
+    }
+
+    const playIn = () => {
+      timeline?.kill()
+      setOut()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power4.out' },
+      })
+
+      timeline.to(
+        headlineSplit.lines,
+        {
+          yPercent: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: 1.15,
+          stagger: 0.11,
+          ease: 'power4.out',
+        },
+        0,
+      )
+
+      if (links.length) {
+        timeline.to(
+          links,
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            duration: 1.15,
+            stagger: 0.12,
+            ease: 'power4.out',
+          },
+          0.28,
+        )
+      }
+
+      section.classList.add('is-downloads-animated')
+    }
+
+    const playOut = () => {
+      timeline?.kill()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power2.in' },
+        onComplete: setOut,
+      })
+
+      timeline.to(animTargets, {
+        opacity: 0,
+        duration: 0.45,
+        stagger: 0.03,
+        ease: 'power2.in',
+      })
+    }
+
+    setOut()
+
+    const trigger = ScrollTrigger.create({
+      trigger: section,
+      start: 'top 78%',
+      end: 'bottom 22%',
+      onEnter: playIn,
+      onEnterBack: playIn,
+      onLeave: playOut,
+      onLeaveBack: playOut,
+    })
+
+    ScrollTrigger.addEventListener('refresh', () => {
+      if (trigger.isActive) playIn()
+      else setOut()
+    })
+
+    if (trigger.isActive) playIn()
+  })
+}
+
+function initCtaSection() {
+  const sections = document.querySelectorAll('.section__cta')
+  if (!sections.length) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  sections.forEach((section) => {
+    const eyebrow = section.querySelector('.flex-centred.gap-1 h2')
+    const headline = section.querySelector('.headline-1')
+    const button = section.querySelector('.button')
+
+    if (!headline) return
+
+    if (reducedMotion) {
+      section.classList.add('is-cta-ready', 'is-cta-animated')
+      return
+    }
+
+    let eyebrowSplit = null
+    let headlineSplit = null
+    let timeline = null
+
+    if (eyebrow) {
+      eyebrowSplit = SplitText.create(eyebrow, {
+        type: 'lines',
+        mask: 'lines',
+        linesClass: 'split-line',
+      })
+    }
+
+    headlineSplit = SplitText.create(headline, {
+      type: 'lines',
+      mask: 'lines',
+      linesClass: 'split-line',
+    })
+
+    section.classList.add('is-cta-ready')
+
+    const animTargets = [
+      ...(eyebrowSplit?.lines || []),
+      ...(headlineSplit?.lines || []),
+      button,
+    ].filter(Boolean)
+
+    const setOut = () => {
+      gsap.killTweensOf(animTargets)
+      timeline?.kill()
+
+      if (eyebrowSplit?.lines?.length) {
+        gsap.set(eyebrowSplit.lines, { yPercent: 100, opacity: 0 })
+      }
+
+      gsap.set(headlineSplit.lines, {
+        yPercent: 108,
+        opacity: 0,
+        filter: 'blur(10px)',
+      })
+
+      if (button) gsap.set(button, { y: 28, opacity: 0 })
+
+      section.classList.remove('is-cta-animated')
+    }
+
+    const playIn = () => {
+      timeline?.kill()
+      setOut()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power4.out' },
+      })
+
+      if (eyebrowSplit?.lines?.length) {
+        timeline.to(
+          eyebrowSplit.lines,
+          {
+            yPercent: 0,
+            opacity: 1,
+            duration: 0.95,
+            stagger: 0.06,
+            ease: 'power3.out',
+          },
+          0,
+        )
+      } else if (eyebrow) {
+        gsap.set(eyebrow, { y: 20, opacity: 0 })
+        timeline.to(
+          eyebrow,
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.9,
+            ease: 'power3.out',
+          },
+          0,
+        )
+      }
+
+      timeline.to(
+        headlineSplit.lines,
+        {
+          yPercent: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: 1.15,
+          stagger: 0.11,
+          ease: 'power4.out',
+        },
+        0.42,
+      )
+
+      if (button) {
+        timeline.to(
+          button,
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.8,
+            stagger: 0.05,
+            ease: 'power3.out',
+          },
+          0.72,
+        )
+      }
+
+      section.classList.add('is-cta-animated')
+    }
+
+    const playOut = () => {
+      timeline?.kill()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power2.in' },
+        onComplete: setOut,
+      })
+
+      timeline.to(animTargets, {
+        opacity: 0,
+        duration: 0.45,
+        stagger: 0.03,
+        ease: 'power2.in',
+      })
+    }
+
+    setOut()
+
+    const trigger = ScrollTrigger.create({
+      trigger: section,
+      start: 'top 78%',
+      end: 'bottom 22%',
+      onEnter: playIn,
+      onEnterBack: playIn,
+      onLeave: playOut,
+      onLeaveBack: playOut,
+    })
+
+    ScrollTrigger.addEventListener('refresh', () => {
+      if (trigger.isActive) playIn()
+      else setOut()
+    })
+
+    if (trigger.isActive) playIn()
+  })
+}
+
+function initQuoteSection() {
+  const sections = document.querySelectorAll('.section__quote')
+  if (!sections.length) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  sections.forEach((section) => {
+    const eyebrow = section.querySelector('.flex-centred.gap-1 h2')
+    const headline = section.querySelector('.headline-1')
+    const carousel = section.querySelector('.carousel-c')
+    const glow = section.querySelector('.glow-w')
+
+    if (!eyebrow && !headline) return
+
+    if (reducedMotion) {
+      section.classList.add('is-quote-ready', 'is-quote-animated')
+      return
+    }
+
+    let eyebrowSplit = null
+    let headlineSplit = null
+    let timeline = null
+
+    if (eyebrow) {
+      eyebrowSplit = SplitText.create(eyebrow, {
+        type: 'lines',
+        mask: 'lines',
+        linesClass: 'split-line',
+      })
+    }
+
+    if (headline) {
+      headlineSplit = SplitText.create(headline, {
+        type: 'lines',
+        mask: 'lines',
+        linesClass: 'split-line',
+      })
+    }
+
+    section.classList.add('is-quote-ready')
+
+    const animTargets = [
+      ...(eyebrowSplit?.lines || []),
+      ...(headlineSplit?.lines || []),
+      carousel,
+      glow,
+    ].filter(Boolean)
+
+    const setOut = () => {
+      gsap.killTweensOf(animTargets)
+      timeline?.kill()
+
+      if (eyebrowSplit?.lines?.length) {
+        gsap.set(eyebrowSplit.lines, {
+          yPercent: 108,
+          opacity: 0,
+          filter: 'blur(10px)',
+        })
+      }
+
+      if (headlineSplit?.lines?.length) {
+        gsap.set(headlineSplit.lines, {
+          yPercent: 108,
+          opacity: 0,
+          filter: 'blur(10px)',
+        })
+      }
+
+      if (carousel) {
+        gsap.set(carousel, { y: 40, opacity: 0 })
+      }
+
+      if (glow) {
+        gsap.set(glow, {
+          xPercent: -50,
+          yPercent: -50,
+          scale: 1.5,
+          opacity: 0,
+          filter: 'blur(24px)',
+          transformOrigin: '50% 50%',
+        })
+      }
+
+      section.classList.remove('is-quote-animated')
+    }
+
+    const playIn = () => {
+      timeline?.kill()
+      setOut()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power4.out' },
+      })
+
+      if (eyebrowSplit?.lines?.length) {
+        timeline.to(
+          eyebrowSplit.lines,
+          {
+            yPercent: 0,
+            opacity: 1,
+            filter: 'blur(0px)',
+            duration: 1.15,
+            stagger: 0.11,
+            ease: 'power4.out',
+          },
+          0,
+        )
+      }
+
+      if (headlineSplit?.lines?.length) {
+        timeline.to(
+          headlineSplit.lines,
+          {
+            yPercent: 0,
+            opacity: 1,
+            filter: 'blur(0px)',
+            duration: 1.15,
+            stagger: 0.11,
+            ease: 'power4.out',
+          },
+          0,
+        )
+      }
+
+      if (carousel) {
+        timeline.to(
+          carousel,
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.95,
+            ease: 'power4.out',
+          },
+          0.5,
+        )
+      }
+
+      if (glow) {
+        timeline.to(
+          glow,
+          {
+            xPercent: -50,
+            yPercent: -50,
+            scale: 1,
+            opacity: 1,
+            filter: 'blur(0px)',
+            duration: 1.35,
+            ease: 'power4.out',
+          },
+          0,
+        )
+      }
+
+      section.classList.add('is-quote-animated')
+    }
+
+    const playOut = () => {
+      timeline?.kill()
+
+      timeline = gsap.timeline({
+        defaults: { ease: 'power2.in' },
+        onComplete: setOut,
+      })
+
+      timeline.to(animTargets, {
+        opacity: 0,
+        duration: 0.45,
+        stagger: 0.03,
+        ease: 'power2.in',
+      })
+    }
+
+    setOut()
+
+    const trigger = ScrollTrigger.create({
+      trigger: section,
+      start: 'top 40%',
+      end: 'bottom 22%',
+      onEnter: playIn,
+      onEnterBack: playIn,
+      onLeave: playOut,
+      onLeaveBack: playOut,
+    })
+
+    ScrollTrigger.addEventListener('refresh', () => {
+      if (trigger.isActive) playIn()
+      else setOut()
+    })
+
+    if (trigger.isActive) playIn()
+  })
+}
+
+function initStatsTrack() {
+  const track = document.querySelector('.stats-track')
+  if (!track) return
+
+  const glanceHeadline = track.querySelector('.stats-overlay .headline-4')
+  const mainEl = track.querySelector('[data-stat="main"]')
+  const infoEl = track.querySelector('[data-stat="info"]')
+  const items = track.querySelectorAll('.stats-data[data-stat-data][data-stat-info]')
+
+  if (!mainEl || !infoEl) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  let headlineSplit = null
+  let headlineAnimated = false
+
+  if (glanceHeadline) {
+    if (reducedMotion) {
+      track.classList.add('is-stats-headline-ready')
+    } else {
+      headlineSplit = SplitText.create(glanceHeadline, {
+        type: 'lines',
+        mask: 'lines',
+        linesClass: 'split-line',
+      })
+
+      gsap.set(headlineSplit.lines, {
+        yPercent: 108,
+        opacity: 0,
+        filter: 'blur(10px)',
+      })
+
+      track.classList.add('is-stats-headline-ready')
+    }
+  }
+
+  const animateHeadlineIn = () => {
+    if (!headlineSplit?.lines?.length || headlineAnimated) return
+    headlineAnimated = true
+
+    gsap.to(headlineSplit.lines, {
+      yPercent: 0,
+      opacity: 1,
+      filter: 'blur(0px)',
+      duration: 1.15,
+      stagger: 0.11,
+      ease: 'power4.out',
+    })
+  }
+
+  const initial = {
+    main: mainEl.textContent.trim(),
+    info: infoEl.textContent.trim(),
+  }
+
+  const splits = { main: null, info: null }
+  let activeIndex = -1
+  let statTimeline = null
+
+  const splitElements = () => {
+    splits.main?.revert()
+    splits.info?.revert()
+
+    splits.main = SplitText.create(mainEl, {
+      type: 'chars',
+      mask: 'chars',
+      charsClass: 'split-char',
+    })
+
+    splits.info = SplitText.create(infoEl, {
+      type: 'words',
+      mask: 'words',
+      wordsClass: 'split-word',
+    })
+  }
+
+  const animateIn = () => {
+    gsap.fromTo(
+      splits.main.chars,
+      { yPercent: 110, opacity: 0 },
+      {
+        yPercent: 0,
+        opacity: 1,
+        duration: 0.5,
+        stagger: 0.025,
+        ease: 'power2.inout',
+      },
+    )
+
+    gsap.fromTo(
+      splits.info.words,
+      { yPercent: 110, opacity: 0 },
+      {
+        yPercent: 0,
+        opacity: 1,
+        duration: 0.75,
+        stagger: 0.015,
+        ease: 'power3.out',
+        delay: 0.08,
+      },
+    )
+  }
+
+  const setStat = (main, info, { animate = true } = {}) => {
+    statTimeline?.kill()
+    gsap.killTweensOf([...(splits.main?.chars || []), ...(splits.info?.words || [])])
+
+    const reveal = () => {
+      splits.main?.revert()
+      splits.info?.revert()
+      mainEl.textContent = main
+      infoEl.textContent = info
+      splitElements()
+
+      if (animate) {
+        animateIn()
+        return
+      }
+
+      gsap.set([...splits.main.chars, ...splits.info.words], {
+        yPercent: 0,
+        opacity: 1,
+      })
+    }
+
+    const outTargets =
+      animate && splits.main?.chars?.length
+        ? [...splits.main.chars, ...splits.info.words]
+        : []
+
+    if (!outTargets.length) {
+      reveal()
+      return
+    }
+
+    statTimeline = gsap
+      .timeline()
+      .to(outTargets, {
+        yPercent: -110,
+        opacity: 0,
+        duration: 0.3,
+        stagger: { amount: 0.12 },
+        ease: 'power3.in',
+      })
+      .add(reveal)
+  }
+
+  splitElements()
+  gsap.set([...splits.main.chars, ...splits.info.words], {
+    yPercent: 110,
+    opacity: 0,
+  })
+
+  track.classList.add('is-stats-ready')
+
+  let initialAnimated = false
+  const playInitialIn = () => {
+    if (initialAnimated || activeIndex !== -1) return
+    initialAnimated = true
+
+    if (headlineSplit?.lines?.length) {
+      animateHeadlineIn()
+      gsap.delayedCall(0.42, animateIn)
+    } else {
+      animateIn()
+    }
+  }
+
+  const initialTrigger = ScrollTrigger.create({
+    trigger: track,
+    start: 'top 30%',
+    once: true,
+    onEnter: playInitialIn,
+  })
+
+  ScrollTrigger.addEventListener('refresh', () => {
+    if (!initialAnimated && initialTrigger.isActive && activeIndex === -1) {
+      playInitialIn()
+    }
+  })
+
+  if (initialTrigger.isActive) {
+    playInitialIn()
+  }
+
+  items.forEach((item, index) => {
+    ScrollTrigger.create({
+      trigger: item,
+      start: 'top 55%',
+      end: 'bottom 45%',
+      onEnter: () => {
+        if (activeIndex === index) return
+        activeIndex = index
+        setStat(item.dataset.statData, item.dataset.statInfo)
+      },
+      onEnterBack: () => {
+        if (activeIndex === index) return
+        activeIndex = index
+        setStat(item.dataset.statData, item.dataset.statInfo)
+      },
+      onLeaveBack: () => {
+        if (index !== 0) return
+        if (activeIndex === -1) return
+        activeIndex = -1
+        setStat(initial.main, initial.info)
+      },
+    })
+  })
+}
+
+
+
+function init() {
+  initHeroEntrance()
+  initSectionBodyColors()
+  initSplitSections()
+  initChartSections()
+  initCardPopups()
+
+  initDownloadsSection()
+  initQuoteSection()
+  initCtaSection()
+  initStatsTrack()
+
+  ScrollTrigger.refresh()
+}
+
+if (document.fonts?.ready) {
+  document.fonts.ready.then(init)
+} else {
+  init()
+}
+

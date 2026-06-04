@@ -1,0 +1,189 @@
+.section__hero[data-hero-animate]:not(.is-hero-ready) .headline-jumbo,
+.section__hero[data-hero-animate]:not(.is-hero-ready) .hero-content p,
+.section__hero[data-hero-animate]:not(.is-hero-ready) .hero__c .button {
+  visibility: hidden;
+}
+
+.stats-track[data-stats-animate]:not(.is-stats-headline-ready) .headline-4,
+.stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="main"],
+.stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="info"] {
+  visibility: hidden;
+}
+
+.section__split[data-split-animate]:not(.is-split-ready) .split-image,
+.section__split[data-split-animate]:not(.is-split-ready) .split-content__c .paragraph-large,
+.section__split[data-split-animate]:not(.is-split-ready) .split-content__c .headline-4,
+.section__split[data-split-animate]:not(.is-split-ready) .split-content__c > p,
+.section__split[data-split-animate]:not(.is-split-ready) .split-content__c .button {
+  visibility: hidden;
+}
+
+.section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 h2,
+.section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 > p,
+.section__split-chart:not(.is-split-ready) .chart-bar_w {
+  visibility: hidden;
+}
+
+.section__chart:not(.is-chart-ready) .gap-1 h2,
+.section__chart:not(.is-chart-ready) .gap-1 p,
+.section__chart:not(.is-chart-ready) .chart-grid > div {
+  visibility: hidden;
+}
+
+.section__downloads:not(.is-downloads-ready) .gap-1 h2,
+.section__downloads:not(.is-downloads-ready) .download-link {
+  visibility: hidden;
+}
+
+.download-link {
+  padding-left: 0;
+  padding-right: 0;
+  transition:
+    padding 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    color 0.35s ease;
+}
+
+.download-link svg path {
+  transition: fill 0.35s ease;
+}
+
+.download-link:hover,
+.download-link:focus-visible {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  color: #3d24e6;
+}
+
+.download-link:hover svg path,
+.download-link:focus-visible svg path {
+  fill: #3d24e6;
+}
+
+.section__quote[data-quote-animate]:not(.is-quote-ready) .flex-centred.gap-1 h2,
+.section__quote[data-quote-animate]:not(.is-quote-ready) .headline-1,
+.section__quote[data-quote-animate]:not(.is-quote-ready) .carousel-c,
+.section__quote[data-quote-animate]:not(.is-quote-ready) .glow-w {
+  visibility: hidden;
+}
+
+.section__cta[data-cta-animate]:not(.is-cta-ready) .flex-centred.gap-1 h2,
+.section__cta[data-cta-animate]:not(.is-cta-ready) .headline-1,
+.section__cta[data-cta-animate]:not(.is-cta-ready) .button {
+  visibility: hidden;
+}
+
+.section__quote {
+  position: relative;
+  overflow: hidden;
+}
+
+.section__quote .w-layout-blockcontainer.padding-xl {
+  position: relative;
+  z-index: 1;
+}
+
+.section__quote .glow-w {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+html.is-popup-open,
+html.is-popup-open body {
+  overflow: hidden;
+}
+
+/* Portaled to body on open so position:fixed is not trapped by grid/GSAP ancestors */
+.popup-w[data-portaled='true'] {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--_utility---page-padding);
+  overflow: hidden;
+}
+
+/* Scroll long popup content; page scroll stays locked via html.is-popup-open + Lenis */
+.popup-w[data-portaled='true'] .popup-c {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.section__quote .glow-w .glow {
+  z-index: 1;
+  background-image: radial-gradient(
+    circle farthest-corner at 50% 50%,
+    transparent 30%,
+    transparent 55%,
+    var(--colors--molten-sky) 71%
+  );
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.section__quote .glow-w .glow.is-overlay {
+  z-index: 2;
+  background-image: radial-gradient(
+    circle farthest-corner at 50% 50%,
+    var(--colors--colors--100) 67%,
+    var(--colors--molten-sky) 75%
+  );
+  mix-blend-mode: multiply;
+  position: absolute;
+  inset: 0%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section__hero[data-hero-animate]:not(.is-hero-ready) .headline-jumbo,
+  .section__hero[data-hero-animate]:not(.is-hero-ready) .hero-content p,
+  .section__hero[data-hero-animate]:not(.is-hero-ready) .hero__c .button,
+  .stats-track[data-stats-animate]:not(.is-stats-headline-ready) .headline-4,
+  .stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="main"],
+  .stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="info"] {
+    visibility: visible;
+  }
+
+  .section__split[data-split-animate]:not(.is-split-ready) .split-image,
+  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c .paragraph-large,
+  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c .headline-4,
+  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c > p,
+  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c .button {
+    visibility: visible;
+  }
+
+  .section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 h2,
+  .section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 > p,
+  .section__split-chart:not(.is-split-ready) .chart-bar_w {
+    visibility: visible;
+  }
+
+  .section__chart:not(.is-chart-ready) .gap-1 h2,
+  .section__chart:not(.is-chart-ready) .gap-1 p,
+  .section__chart:not(.is-chart-ready) .chart-grid > div {
+    visibility: visible;
+  }
+
+  .section__downloads:not(.is-downloads-ready) .gap-1 h2,
+  .section__downloads:not(.is-downloads-ready) .download-link {
+    visibility: visible;
+  }
+
+  .section__quote[data-quote-animate]:not(.is-quote-ready) .flex-centred.gap-1 h2,
+  .section__quote[data-quote-animate]:not(.is-quote-ready) .headline-1,
+  .section__quote[data-quote-animate]:not(.is-quote-ready) .carousel-c,
+  .section__quote[data-quote-animate]:not(.is-quote-ready) .glow-w {
+    visibility: visible;
+  }
+
+  .section__cta[data-cta-animate]:not(.is-cta-ready) .flex-centred.gap-1 h2,
+  .section__cta[data-cta-animate]:not(.is-cta-ready) .headline-1,
+  .section__cta[data-cta-animate]:not(.is-cta-ready) .button {
+    visibility: visible;
+  }
+}
