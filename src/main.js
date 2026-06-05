@@ -2,12 +2,9 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { SplitText } from 'gsap/SplitText'
 import Lenis from 'lenis'
-import 'lenis/dist/lenis.css'
 
 const lenis = new Lenis({
   autoRaf: false,
-  lerp: 0.12,
-  wheelMultiplier: 0.6,
   allowNestedScroll: true,
 })
 
@@ -973,6 +970,57 @@ function initStatsTrack() {
         setStat(initial.main, initial.info)
       },
     })
+  })
+
+  const section = track.closest('.section__stats')
+  const dotsWrap = section?.querySelector('.stats-dots-w')
+  if (!dotsWrap) return
+
+  if (reducedMotion) {
+    section.classList.add('is-stats-dots-ready')
+    gsap.set(dotsWrap, { clearProps: 'all' })
+    return
+  }
+
+  const DOTS_OUT = { x: -40, opacity: 0 }
+  const DOTS_IN = { x: 0, opacity: 1, duration: 0.85, ease: 'power3.out' }
+  const DOTS_FADE_OUT = { opacity: 0, duration: 0.45, ease: 'power2.in' }
+
+  let dotsTimeline = null
+
+  const killDots = () => {
+    gsap.killTweensOf(dotsWrap)
+    dotsTimeline?.kill()
+  }
+
+  const setDotsOut = () => {
+    killDots()
+    gsap.set(dotsWrap, DOTS_OUT)
+  }
+
+  const playDotsIn = () => {
+    killDots()
+    dotsTimeline = gsap.fromTo(dotsWrap, DOTS_OUT, DOTS_IN)
+  }
+
+  const playDotsOut = () => {
+    killDots()
+    dotsTimeline = gsap.timeline({
+      defaults: { ease: 'power2.in' },
+      onComplete: setDotsOut,
+    }).to(dotsWrap, DOTS_FADE_OUT)
+  }
+
+  section.classList.add('is-stats-dots-ready')
+  setDotsOut()
+
+  bindScrollReveal({
+    trigger: section,
+    start: 'top 75%',
+    end: 'bottom 25%',
+    playIn: playDotsIn,
+    playOut: playDotsOut,
+    setOut: setDotsOut,
   })
 }
 
