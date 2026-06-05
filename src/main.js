@@ -3,7 +3,6 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { SplitText } from 'gsap/SplitText'
 import Lenis from 'lenis'
 import 'lenis/dist/lenis.css'
-import './animations.css'
 
 const lenis = new Lenis({
   autoRaf: false,
@@ -42,6 +41,117 @@ ScrollTrigger.addEventListener('refresh', () => {
   lenis.resize()
 })
 
+// ─── Shared animation presets ───────────────────────────────────────────────
+
+const SPLIT_LINES = { type: 'lines', mask: 'lines', linesClass: 'split-line' }
+
+const HEADLINE_OUT = { yPercent: 108, opacity: 0, filter: 'blur(10px)' }
+const HEADLINE_IN = {
+  yPercent: 0,
+  opacity: 1,
+  filter: 'blur(0px)',
+  duration: 1.15,
+  stagger: 0.11,
+  ease: 'power4.out',
+}
+const BODY_OUT = { yPercent: 100, opacity: 0 }
+const BODY_IN = {
+  yPercent: 0,
+  opacity: 1,
+  duration: 0.95,
+  stagger: 0.06,
+  ease: 'power3.out',
+}
+const FADE_OUT = { opacity: 0, duration: 0.45, stagger: 0.03, ease: 'power2.in' }
+const ITEM_OUT = { y: 56, opacity: 0, scale: 1.04 }
+const ITEM_IN = { y: 0, opacity: 1, scale: 1, duration: 1.15, ease: 'power4.out' }
+const BUTTON_OUT = { y: 28, opacity: 0 }
+const BUTTON_IN = { y: 0, opacity: 1, duration: 0.8, ease: 'power3.out' }
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function splitLines(el) {
+  return el ? SplitText.create(el, SPLIT_LINES) : null
+}
+
+function setHeadlineOut(lines) {
+  if (lines?.length) gsap.set(lines, HEADLINE_OUT)
+}
+
+function setBodyOut(lines) {
+  if (lines?.length) gsap.set(lines, BODY_OUT)
+}
+
+function addHeadlineIn(tl, lines, at = 0) {
+  if (lines?.length) tl.to(lines, HEADLINE_IN, at)
+}
+
+function addBodyIn(tl, lines, at) {
+  if (lines?.length) tl.to(lines, BODY_IN, at)
+}
+
+function addItemsIn(tl, items, at, stagger) {
+  if (items?.length) tl.to(items, { ...ITEM_IN, stagger }, at)
+}
+
+// Single refresh bus instead of one listener per section
+const refreshHandlers = new Set()
+ScrollTrigger.addEventListener('refresh', () => {
+  refreshHandlers.forEach((fn) => fn())
+})
+
+function bindScrollReveal({ trigger, start, end, playIn, playOut, setOut }) {
+  const st = ScrollTrigger.create({
+    trigger,
+    start,
+    end,
+    onEnter: playIn,
+    onEnterBack: playIn,
+    onLeave: playOut,
+    onLeaveBack: playOut,
+  })
+
+  refreshHandlers.add(() => {
+    if (st.isActive) playIn()
+    else setOut()
+  })
+
+  if (st.isActive) playIn()
+}
+
+function createRevealController(animTargets) {
+  let timeline = null
+
+  const kill = () => {
+    gsap.killTweensOf(animTargets)
+    timeline?.kill()
+  }
+
+  const playOut = (setOut) => {
+    timeline?.kill()
+    timeline = gsap.timeline({
+      defaults: { ease: 'power2.in' },
+      onComplete: setOut,
+    }).to(animTargets, FADE_OUT)
+  }
+
+  const playIn = (setOut, buildTimeline) => {
+    timeline?.kill()
+    setOut()
+    timeline = gsap.timeline({ defaults: { ease: 'power4.out' } })
+    buildTimeline(timeline)
+    return timeline
+  }
+
+  return { kill, playIn, playOut }
+}
+
+function skipReveal(section, readyClass, animatedClass, onSkip) {
+  section.classList.add(readyClass, animatedClass)
+  onSkip?.()
+}
+
+// ─── Section init ───────────────────────────────────────────────────────────
 
 function initSectionBodyColors() {
   const sections = document.querySelectorAll('[data-color]')
@@ -77,8 +187,6 @@ function initNavigationEntrance() {
   const nav = document.querySelector('.navigation')
   if (!nav) return
 
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
   if (reducedMotion) {
     nav.classList.add('is-nav-ready', 'is-nav-animated')
     gsap.set(nav, { clearProps: 'all' })
@@ -93,20 +201,8 @@ function initNavigationEntrance() {
       delay: 0.8,
       onComplete: () => nav.classList.add('is-nav-animated'),
     })
-    .to(nav, {
-      y: 0,
-      duration: 1.5,
-      ease: 'power4.out',
-    })
-    .to(
-      nav,
-      {
-        opacity: 1,
-        duration: 1.35,
-        ease: 'power2.out',
-      },
-      0,
-    )
+    .to(nav, { y: 0, duration: 1.5, ease: 'power4.out' })
+    .to(nav, { opacity: 1, duration: 1.35, ease: 'power2.out' }, 0)
 }
 
 function initHeroEntrance() {
@@ -119,111 +215,41 @@ function initHeroEntrance() {
 
   if (!headline) return
 
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
   if (reducedMotion) {
     hero.classList.add('is-hero-ready', 'is-hero-animated')
     gsap.set([headline, subcopy, ...buttons].filter(Boolean), { clearProps: 'all' })
     return
   }
 
-  let headlineSplit = null
-  let subcopySplit = null
+  const headlineSplit = splitLines(headline)
+  const subcopySplit = subcopy ? splitLines(subcopy) : null
 
-  const playEntrance = () => {
-    headlineSplit?.revert()
-    subcopySplit?.revert()
+  setHeadlineOut(headlineSplit.lines)
+  if (subcopySplit) setBodyOut(subcopySplit.lines)
+  if (buttons.length) gsap.set(buttons, BUTTON_OUT)
 
-    headlineSplit = SplitText.create(headline, {
-      type: 'lines',
-      mask: 'lines',
-      linesClass: 'split-line',
-    })
+  hero.classList.add('is-hero-ready')
 
-    gsap.set(headlineSplit.lines, {
-      yPercent: 108,
-      opacity: 0,
-      filter: 'blur(10px)',
-    })
+  const tl = gsap.timeline({ defaults: { ease: 'power4.out' }, delay: 0.15 })
 
-    if (subcopy) {
-      subcopySplit = SplitText.create(subcopy, {
-        type: 'lines',
-        mask: 'lines',
-        linesClass: 'split-line',
-      })
+  addHeadlineIn(tl, headlineSplit.lines, 0)
 
-      gsap.set(subcopySplit.lines, { yPercent: 100, opacity: 0 })
-    }
-
-    if (buttons.length) {
-      gsap.set(buttons, { y: 28, opacity: 0 })
-    }
-
-    hero.classList.add('is-hero-ready')
-
-    const tl = gsap.timeline({
-      defaults: { ease: 'power4.out' },
-      delay: 0.15,
-    })
-
-    tl.to(
-      headlineSplit.lines,
-      {
-        yPercent: 0,
-        opacity: 1,
-        filter: 'blur(0px)',
-        duration: 1.15,
-        stagger: 0.11,
-        ease: 'power4.out',
-      },
-      0,
-    )
-
-    if (subcopySplit?.lines?.length) {
-      tl.to(
-        subcopySplit.lines,
-        {
-          yPercent: 0,
-          opacity: 1,
-          duration: 0.95,
-          stagger: 0.06,
-          ease: 'power3.out',
-        },
-        0.42,
-      )
-    } else if (subcopy) {
-      gsap.set(subcopy, { y: 20, opacity: 0 })
-      tl.to(
-        subcopy,
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.9,
-          ease: 'power3.out',
-        },
-        0.42,
-      )
-    }
-
-    if (buttons.length) {
-      tl.to(
-        buttons,
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.8,
-          stagger: 0.05,
-          ease: 'power3.out',
-        },
-        subcopy || subcopySplit ? 0.72 : 0.55,
-      )
-    }
-
-    hero.classList.add('is-hero-animated')
+  if (subcopySplit?.lines?.length) {
+    addBodyIn(tl, subcopySplit.lines, 0.42)
+  } else if (subcopy) {
+    gsap.set(subcopy, { y: 20, opacity: 0 })
+    tl.to(subcopy, { y: 0, opacity: 1, duration: 0.9, ease: 'power3.out' }, 0.42)
   }
 
-  playEntrance()
+  if (buttons.length) {
+    tl.to(
+      buttons,
+      { ...BUTTON_IN, stagger: 0.05 },
+      subcopy || subcopySplit ? 0.72 : 0.55,
+    )
+  }
+
+  hero.classList.add('is-hero-animated')
 }
 
 function getSplitSectionElements(section) {
@@ -231,8 +257,8 @@ function getSplitSectionElements(section) {
     return {
       image: section.querySelector('.chart-bar_w'),
       eyebrow: null,
-      headline: section.querySelector('.split-chart-c .gap-1 h2'),
-      body: section.querySelector('.split-chart-c .gap-1 > p'),
+      headline: section.querySelector('.split-chart-c h2'),
+      body: section.querySelector('.split-chart-c p'),
       button: null,
       imageFromRight: true,
     }
@@ -252,8 +278,6 @@ function initSplitSections() {
   const sections = document.querySelectorAll('.section__split, .section__split-chart')
   if (!sections.length) return
 
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
   sections.forEach((section) => {
     const { image, eyebrow, headline, body, button, imageFromRight } =
       getSplitSectionElements(section)
@@ -261,54 +285,29 @@ function initSplitSections() {
     if (!headline) return
 
     if (reducedMotion) {
-      section.classList.add('is-split-ready', 'is-split-animated')
+      skipReveal(section, 'is-split-ready', 'is-split-animated')
       return
     }
 
-    let headlineSplit = null
-    let bodySplit = null
-    let timeline = null
-
-    headlineSplit = SplitText.create(headline, {
-      type: 'lines',
-      mask: 'lines',
-      linesClass: 'split-line',
-    })
-
-    if (body) {
-      bodySplit = SplitText.create(body, {
-        type: 'lines',
-        mask: 'lines',
-        linesClass: 'split-line',
-      })
-    }
-
-    section.classList.add('is-split-ready')
+    const headlineSplit = splitLines(headline)
+    const bodySplit = splitLines(body)
 
     const animTargets = [
-      ...(headlineSplit?.lines || []),
+      ...headlineSplit.lines,
       ...(bodySplit?.lines || []),
       eyebrow,
       button,
       image,
     ].filter(Boolean)
 
+    const { kill, playIn, playOut } = createRevealController(animTargets)
+
     const setOut = () => {
-      gsap.killTweensOf(animTargets)
-      timeline?.kill()
-
-      gsap.set(headlineSplit.lines, {
-        yPercent: 108,
-        opacity: 0,
-        filter: 'blur(10px)',
-      })
-
-      if (bodySplit?.lines?.length) {
-        gsap.set(bodySplit.lines, { yPercent: 100, opacity: 0 })
-      }
-
+      kill()
+      setHeadlineOut(headlineSplit.lines)
+      setBodyOut(bodySplit?.lines)
       if (eyebrow) gsap.set(eyebrow, { y: 16, opacity: 0 })
-      if (button) gsap.set(button, { y: 28, opacity: 0 })
+      if (button) gsap.set(button, BUTTON_OUT)
       if (image) {
         gsap.set(image, {
           x: imageFromRight ? 72 : -72,
@@ -316,122 +315,37 @@ function initSplitSections() {
           scale: 1.04,
         })
       }
-
       section.classList.remove('is-split-animated')
     }
 
-    const playIn = () => {
-      timeline?.kill()
-      setOut()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power4.out' },
+    const runIn = () => {
+      playIn(setOut, (tl) => {
+        if (image) {
+          tl.to(image, { x: 0, opacity: 1, scale: 1, duration: 1.15, ease: 'power4.out' }, 0)
+        }
+        if (eyebrow) {
+          tl.to(eyebrow, { y: 0, opacity: 1, duration: 0.75, ease: 'power3.out' }, image ? 0.18 : 0)
+        }
+        addHeadlineIn(tl, headlineSplit.lines, image ? 0.28 : 0.12)
+        addBodyIn(tl, bodySplit?.lines, image ? 0.5 : 0.38)
+        if (button) {
+          tl.to(button, BUTTON_IN, image ? 0.72 : 0.58)
+        }
       })
-
-      if (image) {
-        timeline.to(
-          image,
-          {
-            x: 0,
-            opacity: 1,
-            scale: 1,
-            duration: 1.15,
-            ease: 'power4.out',
-          },
-          0,
-        )
-      }
-
-      if (eyebrow) {
-        timeline.to(
-          eyebrow,
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.75,
-            ease: 'power3.out',
-          },
-          image ? 0.18 : 0,
-        )
-      }
-
-      timeline.to(
-        headlineSplit.lines,
-        {
-          yPercent: 0,
-          opacity: 1,
-          filter: 'blur(0px)',
-          duration: 1.15,
-          stagger: 0.11,
-          ease: 'power4.out',
-        },
-        image ? 0.28 : 0.12,
-      )
-
-      if (bodySplit?.lines?.length) {
-        timeline.to(
-          bodySplit.lines,
-          {
-            yPercent: 0,
-            opacity: 1,
-            duration: 0.95,
-            stagger: 0.06,
-            ease: 'power3.out',
-          },
-          image ? 0.5 : 0.38,
-        )
-      }
-
-      if (button) {
-        timeline.to(
-          button,
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.8,
-            ease: 'power3.out',
-          },
-          image ? 0.72 : 0.58,
-        )
-      }
-
       section.classList.add('is-split-animated')
     }
 
-    const playOut = () => {
-      timeline?.kill()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power2.in' },
-        onComplete: setOut,
-      })
-
-      timeline.to(animTargets, {
-        opacity: 0,
-        duration: 0.45,
-        stagger: 0.03,
-        ease: 'power2.in',
-      })
-    }
-
+    section.classList.add('is-split-ready')
     setOut()
 
-    const trigger = ScrollTrigger.create({
+    bindScrollReveal({
       trigger: section,
       start: 'top 45%',
       end: 'bottom 22%',
-      onEnter: playIn,
-      onEnterBack: playIn,
-      onLeave: playOut,
-      onLeaveBack: playOut,
+      playIn: runIn,
+      playOut: () => playOut(setOut),
+      setOut,
     })
-
-    ScrollTrigger.addEventListener('refresh', () => {
-      if (trigger.isActive) playIn()
-      else setOut()
-    })
-
-    if (trigger.isActive) playIn()
   })
 }
 
@@ -469,178 +383,106 @@ function scheduleDonutPlay(gridItem, delay) {
   })
 }
 
-function initChartSections() {
-  const sections = document.querySelectorAll('.section__chart')
-  if (!sections.length) return
-
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  sections.forEach((section) => {
-    const headline = section.querySelector('.gap-1 h2')
-    const body = section.querySelector('.gap-1 p')
-    const gridItems = section.querySelectorAll('.chart-grid > .card-w')
-
-    if (!headline) return
+function initContentRevealSection({
+  selector,
+  readyClass,
+  animatedClass,
+  scrollStart,
+  scrollEnd,
+  getContent,
+  buildTimeline,
+  onReducedMotion,
+}) {
+  document.querySelectorAll(selector).forEach((section) => {
+    const content = getContent(section)
+    if (!content?.headline) return
 
     if (reducedMotion) {
-      section.classList.add('is-chart-ready', 'is-chart-animated')
-      gridItems.forEach((item) => scheduleDonutPlay(item, 0))
+      skipReveal(section, readyClass, animatedClass, onReducedMotion?.bind(null, section, content))
       return
     }
 
-    let headlineSplit = null
-    let bodySplit = null
-    let timeline = null
-    let donutsIntroPlayed = false
-
-    headlineSplit = SplitText.create(headline, {
-      type: 'lines',
-      mask: 'lines',
-      linesClass: 'split-line',
-    })
-
-    if (body) {
-      bodySplit = SplitText.create(body, {
-        type: 'lines',
-        mask: 'lines',
-        linesClass: 'split-line',
-      })
-    }
-
-    section.classList.add('is-chart-ready')
+    const headlineSplit = splitLines(content.headline)
+    const bodySplit = content.body ? splitLines(content.body) : null
 
     const animTargets = [
-      ...(headlineSplit?.lines || []),
+      ...headlineSplit.lines,
       ...(bodySplit?.lines || []),
-      ...gridItems,
+      ...(content.extraTargets || []),
     ].filter(Boolean)
 
+    const { kill, playIn, playOut } = createRevealController(animTargets)
+    let sideEffectPlayed = false
+
     const setOut = () => {
-      gsap.killTweensOf(animTargets)
-      timeline?.kill()
-
-      gsap.set(headlineSplit.lines, {
-        yPercent: 108,
-        opacity: 0,
-        filter: 'blur(10px)',
-      })
-
-      if (bodySplit?.lines?.length) {
-        gsap.set(bodySplit.lines, { yPercent: 100, opacity: 0 })
-      }
-
-      if (gridItems.length) {
-        gsap.set(gridItems, {
-          y: 56,
-          opacity: 0,
-          scale: 1.04,
-        })
-      }
-
-      section.classList.remove('is-chart-animated')
+      kill()
+      setHeadlineOut(headlineSplit.lines)
+      setBodyOut(bodySplit?.lines)
+      content.setExtraOut?.()
+      section.classList.remove(animatedClass)
     }
 
-    const playIn = () => {
-      timeline?.kill()
-      setOut()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power4.out' },
+    const runIn = () => {
+      playIn(setOut, (tl) => {
+        buildTimeline(tl, { headlineSplit, bodySplit, content, section })
+        if (content.onPlayIn && !sideEffectPlayed) {
+          sideEffectPlayed = true
+          content.onPlayIn()
+        }
       })
-
-      timeline.to(
-        headlineSplit.lines,
-        {
-          yPercent: 0,
-          opacity: 1,
-          filter: 'blur(0px)',
-          duration: 1.15,
-          stagger: 0.11,
-          ease: 'power4.out',
-        },
-        0,
-      )
-
-      if (bodySplit?.lines?.length) {
-        timeline.to(
-          bodySplit.lines,
-          {
-            yPercent: 0,
-            opacity: 1,
-            duration: 0.95,
-            stagger: 0.06,
-            ease: 'power3.out',
-          },
-          0.28,
-        )
-      }
-
-      if (gridItems.length) {
-        timeline.to(
-          gridItems,
-          {
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            duration: 1.15,
-            stagger: 0.25,
-            ease: 'power4.out',
-          },
-          0.42,
-        )
-      }
-
-      if (!donutsIntroPlayed && gridItems.length) {
-        donutsIntroPlayed = true
-        gridItems.forEach((item, i) => {
-          scheduleDonutPlay(item, 0.42 + i * 0.25)
-        })
-      }
-
-      section.classList.add('is-chart-animated')
+      section.classList.add(animatedClass)
     }
 
-    const playOut = () => {
-      timeline?.kill()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power2.in' },
-        onComplete: setOut,
-      })
-
-      timeline.to(animTargets, {
-        opacity: 0,
-        duration: 0.45,
-        stagger: 0.03,
-        ease: 'power2.in',
-      })
-    }
-
+    section.classList.add(readyClass)
     setOut()
 
-    const trigger = ScrollTrigger.create({
+    bindScrollReveal({
       trigger: section,
-      start: 'top 78%',
-      end: 'bottom 22%',
-      onEnter: playIn,
-      onEnterBack: playIn,
-      onLeave: playOut,
-      onLeaveBack: playOut,
+      start: scrollStart,
+      end: scrollEnd,
+      playIn: runIn,
+      playOut: () => playOut(setOut),
+      setOut,
     })
+  })
+}
 
-    ScrollTrigger.addEventListener('refresh', () => {
-      if (trigger.isActive) playIn()
-      else setOut()
-    })
-
-    if (trigger.isActive) playIn()
+function initChartSections() {
+  initContentRevealSection({
+    selector: '.section__chart',
+    readyClass: 'is-chart-ready',
+    animatedClass: 'is-chart-animated',
+    scrollStart: 'top 78%',
+    scrollEnd: 'bottom 22%',
+    getContent: (section) => {
+      const gridItems = section.querySelectorAll('.chart-grid > .card-w')
+      return {
+        headline: section.querySelector('.gap-1 h2'),
+        body: section.querySelector('.gap-1 p'),
+        extraTargets: [...gridItems],
+        gridItems,
+        setExtraOut() {
+          if (gridItems.length) gsap.set(gridItems, ITEM_OUT)
+        },
+        onPlayIn() {
+          gridItems.forEach((item, i) => scheduleDonutPlay(item, 0.42 + i * 0.25))
+        },
+      }
+    },
+    buildTimeline(tl, { headlineSplit, bodySplit, content }) {
+      addHeadlineIn(tl, headlineSplit.lines, 0)
+      addBodyIn(tl, bodySplit?.lines, 0.28)
+      addItemsIn(tl, content.gridItems, 0.42, 0.25)
+    },
+    onReducedMotion(section, content) {
+      content.gridItems.forEach((item) => scheduleDonutPlay(item, 0))
+    },
   })
 }
 
 function initCardPopups() {
   const cardPopups = new WeakMap()
   const popupToCard = new WeakMap()
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   document.querySelectorAll('.card-w').forEach((card) => {
     const popupWrap = card.querySelector('.popup-w')
@@ -659,19 +501,8 @@ function initCardPopups() {
   let popupTimeline = null
   let isClosing = false
 
-  const panelVisible = {
-    y: 0,
-    opacity: 1,
-    scale: 1,
-    filter: 'blur(0px)',
-  }
-
-  const panelHidden = {
-    y: 56,
-    opacity: 0,
-    scale: 0.96,
-    filter: 'blur(14px)',
-  }
+  const panelVisible = { y: 0, opacity: 1, scale: 1, filter: 'blur(0px)' }
+  const panelHidden = { y: 56, opacity: 0, scale: 0.96, filter: 'blur(14px)' }
 
   const setScrollLocked = (locked) => {
     document.documentElement.classList.toggle('is-popup-open', locked)
@@ -724,27 +555,15 @@ function initCardPopups() {
 
     isClosing = true
 
-    popupTimeline = gsap.timeline({
-      defaults: { ease: 'power3.in' },
-      onComplete: () => finishClose(popupWrap, onComplete),
-    })
-
-    popupTimeline
-      .to(
-        panel,
-        {
-          ...panelHidden,
-          duration: 0.42,
-        },
-        0,
-      )
+    popupTimeline = gsap
+      .timeline({
+        defaults: { ease: 'power3.in' },
+        onComplete: () => finishClose(popupWrap, onComplete),
+      })
+      .to(panel, { ...panelHidden, duration: 0.42 }, 0)
       .to(
         popupWrap,
-        {
-          backgroundColor: 'rgba(0, 0, 0, 0)',
-          duration: 0.38,
-          ease: 'power2.in',
-        },
+        { backgroundColor: 'rgba(0, 0, 0, 0)', duration: 0.38, ease: 'power2.in' },
         0.06,
       )
   }
@@ -774,26 +593,14 @@ function initCardPopups() {
     gsap.set(popupWrap, { backgroundColor: 'rgba(0, 0, 0, 0)' })
     gsap.set(panel, panelHidden)
 
-    popupTimeline = gsap.timeline({ defaults: { ease: 'power3.out' } })
-
-    popupTimeline
+    popupTimeline = gsap
+      .timeline({ defaults: { ease: 'power3.out' } })
       .to(
         popupWrap,
-        {
-          backgroundColor: 'rgba(0, 0, 0, 0.35)',
-          duration: 0.55,
-          ease: 'power2.out',
-        },
+        { backgroundColor: 'rgba(0, 0, 0, 0.35)', duration: 0.55, ease: 'power2.out' },
         0,
       )
-      .to(
-        panel,
-        {
-          ...panelVisible,
-          duration: 0.7,
-        },
-        0.1,
-      )
+      .to(panel, { ...panelVisible, duration: 0.7 }, 0.1)
   }
 
   document.addEventListener('click', (event) => {
@@ -821,139 +628,32 @@ function initCardPopups() {
 }
 
 function initDownloadsSection() {
-  const sections = document.querySelectorAll('.section__downloads')
-  if (!sections.length) return
-
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  sections.forEach((section) => {
-    const headline = section.querySelector('.gap-1 h2')
-    const links = section.querySelectorAll('.download-link')
-
-    if (!headline) return
-
-    if (reducedMotion) {
-      section.classList.add('is-downloads-ready', 'is-downloads-animated')
-      return
-    }
-
-    let headlineSplit = null
-    let timeline = null
-
-    headlineSplit = SplitText.create(headline, {
-      type: 'lines',
-      mask: 'lines',
-      linesClass: 'split-line',
-    })
-
-    section.classList.add('is-downloads-ready')
-
-    const animTargets = [...(headlineSplit?.lines || []), ...links].filter(Boolean)
-
-    const setOut = () => {
-      gsap.killTweensOf(animTargets)
-      timeline?.kill()
-
-      gsap.set(headlineSplit.lines, {
-        yPercent: 108,
-        opacity: 0,
-        filter: 'blur(10px)',
-      })
-
-      if (links.length) {
-        gsap.set(links, {
-          y: 56,
-          opacity: 0,
-          scale: 1.04,
-        })
-      }
-
-      section.classList.remove('is-downloads-animated')
-    }
-
-    const playIn = () => {
-      timeline?.kill()
-      setOut()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power4.out' },
-      })
-
-      timeline.to(
-        headlineSplit.lines,
-        {
-          yPercent: 0,
-          opacity: 1,
-          filter: 'blur(0px)',
-          duration: 1.15,
-          stagger: 0.11,
-          ease: 'power4.out',
+  initContentRevealSection({
+    selector: '.section__downloads',
+    readyClass: 'is-downloads-ready',
+    animatedClass: 'is-downloads-animated',
+    scrollStart: 'top 78%',
+    scrollEnd: 'bottom 22%',
+    getContent: (section) => {
+      const links = section.querySelectorAll('.download-link')
+      return {
+        headline: section.querySelector('.gap-1 h2'),
+        extraTargets: [...links],
+        links,
+        setExtraOut() {
+          if (links.length) gsap.set(links, ITEM_OUT)
         },
-        0,
-      )
-
-      if (links.length) {
-        timeline.to(
-          links,
-          {
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            duration: 1.15,
-            stagger: 0.12,
-            ease: 'power4.out',
-          },
-          0.28,
-        )
       }
-
-      section.classList.add('is-downloads-animated')
-    }
-
-    const playOut = () => {
-      timeline?.kill()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power2.in' },
-        onComplete: setOut,
-      })
-
-      timeline.to(animTargets, {
-        opacity: 0,
-        duration: 0.45,
-        stagger: 0.03,
-        ease: 'power2.in',
-      })
-    }
-
-    setOut()
-
-    const trigger = ScrollTrigger.create({
-      trigger: section,
-      start: 'top 78%',
-      end: 'bottom 22%',
-      onEnter: playIn,
-      onEnterBack: playIn,
-      onLeave: playOut,
-      onLeaveBack: playOut,
-    })
-
-    ScrollTrigger.addEventListener('refresh', () => {
-      if (trigger.isActive) playIn()
-      else setOut()
-    })
-
-    if (trigger.isActive) playIn()
+    },
+    buildTimeline(tl, { headlineSplit, content }) {
+      addHeadlineIn(tl, headlineSplit.lines, 0)
+      addItemsIn(tl, content.links, 0.28, 0.12)
+    },
   })
 }
 
 function initCtaSection() {
-  const sections = document.querySelectorAll('.section__cta')
-  if (!sections.length) return
-
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  sections.forEach((section) => {
+  document.querySelectorAll('.section__cta').forEach((section) => {
     const eyebrow = section.querySelector('.flex-centred.gap-1 h2')
     const headline = section.querySelector('.headline-1')
     const button = section.querySelector('.button')
@@ -961,163 +661,59 @@ function initCtaSection() {
     if (!headline) return
 
     if (reducedMotion) {
-      section.classList.add('is-cta-ready', 'is-cta-animated')
+      skipReveal(section, 'is-cta-ready', 'is-cta-animated')
       return
     }
 
-    let eyebrowSplit = null
-    let headlineSplit = null
-    let timeline = null
-
-    if (eyebrow) {
-      eyebrowSplit = SplitText.create(eyebrow, {
-        type: 'lines',
-        mask: 'lines',
-        linesClass: 'split-line',
-      })
-    }
-
-    headlineSplit = SplitText.create(headline, {
-      type: 'lines',
-      mask: 'lines',
-      linesClass: 'split-line',
-    })
-
-    section.classList.add('is-cta-ready')
+    const eyebrowSplit = splitLines(eyebrow)
+    const headlineSplit = splitLines(headline)
 
     const animTargets = [
       ...(eyebrowSplit?.lines || []),
-      ...(headlineSplit?.lines || []),
+      ...headlineSplit.lines,
       button,
     ].filter(Boolean)
 
+    const { kill, playIn, playOut } = createRevealController(animTargets)
+
     const setOut = () => {
-      gsap.killTweensOf(animTargets)
-      timeline?.kill()
-
-      if (eyebrowSplit?.lines?.length) {
-        gsap.set(eyebrowSplit.lines, { yPercent: 100, opacity: 0 })
-      }
-
-      gsap.set(headlineSplit.lines, {
-        yPercent: 108,
-        opacity: 0,
-        filter: 'blur(10px)',
-      })
-
-      if (button) gsap.set(button, { y: 28, opacity: 0 })
-
+      kill()
+      setBodyOut(eyebrowSplit?.lines)
+      setHeadlineOut(headlineSplit.lines)
+      if (button) gsap.set(button, BUTTON_OUT)
       section.classList.remove('is-cta-animated')
     }
 
-    const playIn = () => {
-      timeline?.kill()
-      setOut()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power4.out' },
+    const runIn = () => {
+      playIn(setOut, (tl) => {
+        if (eyebrowSplit?.lines?.length) {
+          addBodyIn(tl, eyebrowSplit.lines, 0)
+        } else if (eyebrow) {
+          gsap.set(eyebrow, { y: 20, opacity: 0 })
+          tl.to(eyebrow, { y: 0, opacity: 1, duration: 0.9, ease: 'power3.out' }, 0)
+        }
+        addHeadlineIn(tl, headlineSplit.lines, 0.42)
+        if (button) tl.to(button, { ...BUTTON_IN, stagger: 0.05 }, 0.72)
       })
-
-      if (eyebrowSplit?.lines?.length) {
-        timeline.to(
-          eyebrowSplit.lines,
-          {
-            yPercent: 0,
-            opacity: 1,
-            duration: 0.95,
-            stagger: 0.06,
-            ease: 'power3.out',
-          },
-          0,
-        )
-      } else if (eyebrow) {
-        gsap.set(eyebrow, { y: 20, opacity: 0 })
-        timeline.to(
-          eyebrow,
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.9,
-            ease: 'power3.out',
-          },
-          0,
-        )
-      }
-
-      timeline.to(
-        headlineSplit.lines,
-        {
-          yPercent: 0,
-          opacity: 1,
-          filter: 'blur(0px)',
-          duration: 1.15,
-          stagger: 0.11,
-          ease: 'power4.out',
-        },
-        0.42,
-      )
-
-      if (button) {
-        timeline.to(
-          button,
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.8,
-            stagger: 0.05,
-            ease: 'power3.out',
-          },
-          0.72,
-        )
-      }
-
       section.classList.add('is-cta-animated')
     }
 
-    const playOut = () => {
-      timeline?.kill()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power2.in' },
-        onComplete: setOut,
-      })
-
-      timeline.to(animTargets, {
-        opacity: 0,
-        duration: 0.45,
-        stagger: 0.03,
-        ease: 'power2.in',
-      })
-    }
-
+    section.classList.add('is-cta-ready')
     setOut()
 
-    const trigger = ScrollTrigger.create({
+    bindScrollReveal({
       trigger: section,
       start: 'top 78%',
       end: 'bottom 22%',
-      onEnter: playIn,
-      onEnterBack: playIn,
-      onLeave: playOut,
-      onLeaveBack: playOut,
+      playIn: runIn,
+      playOut: () => playOut(setOut),
+      setOut,
     })
-
-    ScrollTrigger.addEventListener('refresh', () => {
-      if (trigger.isActive) playIn()
-      else setOut()
-    })
-
-    if (trigger.isActive) playIn()
   })
 }
 
 function initQuoteSection() {
-  const sections = document.querySelectorAll('.section__quote')
-  if (!sections.length) return
-
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  sections.forEach((section) => {
+  document.querySelectorAll('.section__quote').forEach((section) => {
     const eyebrow = section.querySelector('.flex-centred.gap-1 h2')
     const headline = section.querySelector('.headline-1')
     const carousel = section.querySelector('.carousel-c')
@@ -1126,31 +722,12 @@ function initQuoteSection() {
     if (!eyebrow && !headline) return
 
     if (reducedMotion) {
-      section.classList.add('is-quote-ready', 'is-quote-animated')
+      skipReveal(section, 'is-quote-ready', 'is-quote-animated')
       return
     }
 
-    let eyebrowSplit = null
-    let headlineSplit = null
-    let timeline = null
-
-    if (eyebrow) {
-      eyebrowSplit = SplitText.create(eyebrow, {
-        type: 'lines',
-        mask: 'lines',
-        linesClass: 'split-line',
-      })
-    }
-
-    if (headline) {
-      headlineSplit = SplitText.create(headline, {
-        type: 'lines',
-        mask: 'lines',
-        linesClass: 'split-line',
-      })
-    }
-
-    section.classList.add('is-quote-ready')
+    const eyebrowSplit = splitLines(eyebrow)
+    const headlineSplit = splitLines(headline)
 
     const animTargets = [
       ...(eyebrowSplit?.lines || []),
@@ -1159,30 +736,13 @@ function initQuoteSection() {
       glow,
     ].filter(Boolean)
 
+    const { kill, playIn, playOut } = createRevealController(animTargets)
+
     const setOut = () => {
-      gsap.killTweensOf(animTargets)
-      timeline?.kill()
-
-      if (eyebrowSplit?.lines?.length) {
-        gsap.set(eyebrowSplit.lines, {
-          yPercent: 108,
-          opacity: 0,
-          filter: 'blur(10px)',
-        })
-      }
-
-      if (headlineSplit?.lines?.length) {
-        gsap.set(headlineSplit.lines, {
-          yPercent: 108,
-          opacity: 0,
-          filter: 'blur(10px)',
-        })
-      }
-
-      if (carousel) {
-        gsap.set(carousel, { y: 40, opacity: 0 })
-      }
-
+      kill()
+      setHeadlineOut(eyebrowSplit?.lines)
+      setHeadlineOut(headlineSplit?.lines)
+      if (carousel) gsap.set(carousel, { y: 40, opacity: 0 })
       if (glow) {
         gsap.set(glow, {
           xPercent: -50,
@@ -1193,115 +753,47 @@ function initQuoteSection() {
           transformOrigin: '50% 50%',
         })
       }
-
       section.classList.remove('is-quote-animated')
     }
 
-    const playIn = () => {
-      timeline?.kill()
-      setOut()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power4.out' },
+    const runIn = () => {
+      playIn(setOut, (tl) => {
+        addHeadlineIn(tl, eyebrowSplit?.lines, 0)
+        addHeadlineIn(tl, headlineSplit?.lines, 0)
+        if (carousel) {
+          tl.to(carousel, { y: 0, opacity: 1, duration: 0.95, ease: 'power4.out' }, 0.5)
+        }
+        if (glow) {
+          tl.to(
+            glow,
+            {
+              xPercent: -50,
+              yPercent: -50,
+              scale: 1,
+              delay: 0.5,
+              opacity: 1,
+              filter: 'blur(0px)',
+              duration: 1.35,
+              ease: 'power4.out',
+            },
+            0,
+          )
+        }
       })
-
-      if (eyebrowSplit?.lines?.length) {
-        timeline.to(
-          eyebrowSplit.lines,
-          {
-            yPercent: 0,
-            opacity: 1,
-            filter: 'blur(0px)',
-            duration: 1.15,
-            stagger: 0.11,
-            ease: 'power4.out',
-          },
-          0,
-        )
-      }
-
-      if (headlineSplit?.lines?.length) {
-        timeline.to(
-          headlineSplit.lines,
-          {
-            yPercent: 0,
-            opacity: 1,
-            filter: 'blur(0px)',
-            duration: 1.15,
-            stagger: 0.11,
-            ease: 'power4.out',
-          },
-          0,
-        )
-      }
-
-      if (carousel) {
-        timeline.to(
-          carousel,
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.95,
-            ease: 'power4.out',
-          },
-          0.5,
-        )
-      }
-
-      if (glow) {
-        timeline.to(
-          glow,
-          {
-            xPercent: -50,
-            yPercent: -50,
-            scale: 1,
-            delay: 0.5,
-            opacity: 1,
-            filter: 'blur(0px)',
-            duration: 1.35,
-            ease: 'power4.out',
-          },
-          0,
-        )
-      }
-
       section.classList.add('is-quote-animated')
     }
 
-    const playOut = () => {
-      timeline?.kill()
-
-      timeline = gsap.timeline({
-        defaults: { ease: 'power2.in' },
-        onComplete: setOut,
-      })
-
-      timeline.to(animTargets, {
-        opacity: 0,
-        duration: 0.45,
-        stagger: 0.03,
-        ease: 'power2.in',
-      })
-    }
-
+    section.classList.add('is-quote-ready')
     setOut()
 
-    const trigger = ScrollTrigger.create({
+    bindScrollReveal({
       trigger: section,
       start: 'top 40%',
       end: 'bottom 22%',
-      onEnter: playIn,
-      onEnterBack: playIn,
-      onLeave: playOut,
-      onLeaveBack: playOut,
+      playIn: runIn,
+      playOut: () => playOut(setOut),
+      setOut,
     })
-
-    ScrollTrigger.addEventListener('refresh', () => {
-      if (trigger.isActive) playIn()
-      else setOut()
-    })
-
-    if (trigger.isActive) playIn()
   })
 }
 
@@ -1316,7 +808,6 @@ function initStatsTrack() {
 
   if (!mainEl || !infoEl) return
 
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   let headlineSplit = null
   let headlineAnimated = false
 
@@ -1324,18 +815,8 @@ function initStatsTrack() {
     if (reducedMotion) {
       track.classList.add('is-stats-headline-ready')
     } else {
-      headlineSplit = SplitText.create(glanceHeadline, {
-        type: 'lines',
-        mask: 'lines',
-        linesClass: 'split-line',
-      })
-
-      gsap.set(headlineSplit.lines, {
-        yPercent: 108,
-        opacity: 0,
-        filter: 'blur(10px)',
-      })
-
+      headlineSplit = splitLines(glanceHeadline)
+      setHeadlineOut(headlineSplit.lines)
       track.classList.add('is-stats-headline-ready')
     }
   }
@@ -1343,15 +824,7 @@ function initStatsTrack() {
   const animateHeadlineIn = () => {
     if (!headlineSplit?.lines?.length || headlineAnimated) return
     headlineAnimated = true
-
-    gsap.to(headlineSplit.lines, {
-      yPercent: 0,
-      opacity: 1,
-      filter: 'blur(0px)',
-      duration: 1.15,
-      stagger: 0.11,
-      ease: 'power4.out',
-    })
+    gsap.to(headlineSplit.lines, HEADLINE_IN)
   }
 
   const initial = {
@@ -1384,13 +857,7 @@ function initStatsTrack() {
     gsap.fromTo(
       splits.main.chars,
       { yPercent: 110, opacity: 0 },
-      {
-        yPercent: 0,
-        opacity: 1,
-        duration: 0.5,
-        stagger: 0.025,
-        ease: 'power2.inout',
-      },
+      { yPercent: 0, opacity: 1, duration: 0.5, stagger: 0.025, ease: 'power2.inout' },
     )
 
     gsap.fromTo(
@@ -1423,10 +890,7 @@ function initStatsTrack() {
         return
       }
 
-      gsap.set([...splits.main.chars, ...splits.info.words], {
-        yPercent: 0,
-        opacity: 1,
-      })
+      gsap.set([...splits.main.chars, ...splits.info.words], { yPercent: 0, opacity: 1 })
     }
 
     const outTargets =
@@ -1452,11 +916,7 @@ function initStatsTrack() {
   }
 
   splitElements()
-  gsap.set([...splits.main.chars, ...splits.info.words], {
-    yPercent: 110,
-    opacity: 0,
-  })
-
+  gsap.set([...splits.main.chars, ...splits.info.words], { yPercent: 110, opacity: 0 })
   track.classList.add('is-stats-ready')
 
   let initialAnimated = false
@@ -1479,14 +939,18 @@ function initStatsTrack() {
     onEnter: playInitialIn,
   })
 
-  ScrollTrigger.addEventListener('refresh', () => {
+  refreshHandlers.add(() => {
     if (!initialAnimated && initialTrigger.isActive && activeIndex === -1) {
       playInitialIn()
     }
   })
 
-  if (initialTrigger.isActive) {
-    playInitialIn()
+  if (initialTrigger.isActive) playInitialIn()
+
+  const activateStat = (index) => {
+    if (activeIndex === index) return
+    activeIndex = index
+    setStat(items[index].dataset.statData, items[index].dataset.statInfo)
   }
 
   items.forEach((item, index) => {
@@ -1494,19 +958,10 @@ function initStatsTrack() {
       trigger: item,
       start: 'top 55%',
       end: 'bottom 45%',
-      onEnter: () => {
-        if (activeIndex === index) return
-        activeIndex = index
-        setStat(item.dataset.statData, item.dataset.statInfo)
-      },
-      onEnterBack: () => {
-        if (activeIndex === index) return
-        activeIndex = index
-        setStat(item.dataset.statData, item.dataset.statInfo)
-      },
+      onEnter: () => activateStat(index),
+      onEnterBack: () => activateStat(index),
       onLeaveBack: () => {
-        if (index !== 0) return
-        if (activeIndex === -1) return
+        if (index !== 0 || activeIndex === -1) return
         activeIndex = -1
         setStat(initial.main, initial.info)
       },
@@ -1516,17 +971,13 @@ function initStatsTrack() {
 
 function initButtonHovers() {
   const buttons = document.querySelectorAll('.button')
-  if (!buttons.length) return
-
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!buttons.length || reducedMotion) return
 
   buttons.forEach((button) => {
     const label = button.querySelector(':scope > div')
     if (!label || label.dataset.buttonHoverReady === 'true') return
 
     label.dataset.buttonHoverReady = 'true'
-
-    if (reducedMotion) return
 
     const split = SplitText.create(label, {
       type: 'words',
@@ -1543,32 +994,21 @@ function initButtonHovers() {
 
     let hoverTween = null
 
-    const playHover = () => {
+    const setHover = (yPercent, duration, stagger, ease) => {
       hoverTween?.kill()
       hoverTween = gsap.to(split.words, {
-        yPercent: -100,
-        duration: 0.75,
-        stagger: 0.1,
-        ease: 'power3.out',
+        yPercent,
+        duration,
+        stagger,
+        ease,
         overwrite: 'auto',
       })
     }
 
-    const resetHover = () => {
-      hoverTween?.kill()
-      hoverTween = gsap.to(split.words, {
-        yPercent: 0,
-        duration: 0.65,
-        stagger: 0.08,
-        ease: 'power3.inOut',
-        overwrite: 'auto',
-      })
-    }
-
-    button.addEventListener('mouseenter', playHover)
-    button.addEventListener('mouseleave', resetHover)
-    button.addEventListener('focusin', playHover)
-    button.addEventListener('focusout', resetHover)
+    button.addEventListener('mouseenter', () => setHover(-100, 0.75, 0.1, 'power3.out'))
+    button.addEventListener('mouseleave', () => setHover(0, 0.65, 0.08, 'power3.inOut'))
+    button.addEventListener('focusin', () => setHover(-100, 0.75, 0.1, 'power3.out'))
+    button.addEventListener('focusout', () => setHover(0, 0.65, 0.08, 'power3.inOut'))
   })
 }
 
@@ -1580,7 +1020,6 @@ function init() {
   initSplitSections()
   initChartSections()
   initCardPopups()
-
   initDownloadsSection()
   initQuoteSection()
   initCtaSection()
@@ -1594,4 +1033,3 @@ if (document.fonts?.ready) {
 } else {
   init()
 }
-

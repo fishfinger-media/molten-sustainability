@@ -22,8 +22,8 @@
   visibility: hidden;
 }
 
-.section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 h2,
-.section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 > p,
+.section__split-chart:not(.is-split-ready) .split-chart-c h2,
+.section__split-chart:not(.is-split-ready) .split-chart-c p,
 .section__split-chart:not(.is-split-ready) .chart-bar_w {
   visibility: hidden;
 }
@@ -199,8 +199,8 @@ html.is-popup-open body {
     visibility: visible;
   }
 
-  .section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 h2,
-  .section__split-chart:not(.is-split-ready) .split-chart-c .gap-1 > p,
+  .section__split-chart:not(.is-split-ready) .split-chart-c h2,
+  .section__split-chart:not(.is-split-ready) .split-chart-c p,
   .section__split-chart:not(.is-split-ready) .chart-bar_w {
     visibility: visible;
   }
