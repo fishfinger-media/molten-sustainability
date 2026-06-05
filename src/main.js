@@ -73,6 +73,42 @@ function initSectionBodyColors() {
   })
 }
 
+function initNavigationEntrance() {
+  const nav = document.querySelector('.navigation')
+  if (!nav) return
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  if (reducedMotion) {
+    nav.classList.add('is-nav-ready', 'is-nav-animated')
+    gsap.set(nav, { clearProps: 'all' })
+    return
+  }
+
+  gsap.set(nav, { y: '-100%', opacity: 0 })
+  nav.classList.add('is-nav-ready')
+
+  gsap
+    .timeline({
+      delay: 0.8,
+      onComplete: () => nav.classList.add('is-nav-animated'),
+    })
+    .to(nav, {
+      y: 0,
+      duration: 1.5,
+      ease: 'power4.out',
+    })
+    .to(
+      nav,
+      {
+        opacity: 1,
+        duration: 1.35,
+        ease: 'power2.out',
+      },
+      0,
+    )
+}
+
 function initHeroEntrance() {
   const hero = document.querySelector('.section__hero')
   if (!hero) return
@@ -382,7 +418,7 @@ function initSplitSections() {
 
     const trigger = ScrollTrigger.create({
       trigger: section,
-      start: 'top 78%',
+      start: 'top 45%',
       end: 'bottom 22%',
       onEnter: playIn,
       onEnterBack: playIn,
@@ -1219,6 +1255,7 @@ function initQuoteSection() {
             xPercent: -50,
             yPercent: -50,
             scale: 1,
+            delay: 0.5,
             opacity: 1,
             filter: 'blur(0px)',
             duration: 1.35,
@@ -1477,9 +1514,67 @@ function initStatsTrack() {
   })
 }
 
+function initButtonHovers() {
+  const buttons = document.querySelectorAll('.button')
+  if (!buttons.length) return
 
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  buttons.forEach((button) => {
+    const label = button.querySelector(':scope > div')
+    if (!label || label.dataset.buttonHoverReady === 'true') return
+
+    label.dataset.buttonHoverReady = 'true'
+
+    if (reducedMotion) return
+
+    const split = SplitText.create(label, {
+      type: 'words',
+      mask: 'words',
+      wordsClass: 'split-word',
+    })
+
+    split.words.forEach((word) => {
+      const { color } = getComputedStyle(word)
+      word.style.textShadow = `0 ${word.offsetHeight}px ${color}`
+    })
+
+    gsap.set(split.words, { yPercent: 0 })
+
+    let hoverTween = null
+
+    const playHover = () => {
+      hoverTween?.kill()
+      hoverTween = gsap.to(split.words, {
+        yPercent: -100,
+        duration: 0.75,
+        stagger: 0.1,
+        ease: 'power3.out',
+        overwrite: 'auto',
+      })
+    }
+
+    const resetHover = () => {
+      hoverTween?.kill()
+      hoverTween = gsap.to(split.words, {
+        yPercent: 0,
+        duration: 0.65,
+        stagger: 0.08,
+        ease: 'power3.inOut',
+        overwrite: 'auto',
+      })
+    }
+
+    button.addEventListener('mouseenter', playHover)
+    button.addEventListener('mouseleave', resetHover)
+    button.addEventListener('focusin', playHover)
+    button.addEventListener('focusout', resetHover)
+  })
+}
 
 function init() {
+  initButtonHovers()
+  initNavigationEntrance()
   initHeroEntrance()
   initSectionBodyColors()
   initSplitSections()

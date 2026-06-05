@@ -1,3 +1,7 @@
+.navigation:not(.is-nav-ready) {
+  visibility: hidden;
+}
+
 .section__hero[data-hero-animate]:not(.is-hero-ready) .headline-jumbo,
 .section__hero[data-hero-animate]:not(.is-hero-ready) .hero-content p,
 .section__hero[data-hero-animate]:not(.is-hero-ready) .hero__c .button {
@@ -33,6 +37,40 @@
 .section__downloads:not(.is-downloads-ready) .gap-1 h2,
 .section__downloads:not(.is-downloads-ready) .download-link {
   visibility: hidden;
+}
+
+.button {
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.35s ease;
+}
+
+.button > div {
+  position: relative;
+  z-index: 1;
+}
+
+.button .split-word {
+  text-shadow: 0 1em currentColor;
+}
+
+.button[data-wf--button--variant='blue']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.button[data-wf--button--variant='blue']:is(:hover, :focus-visible)::before {
+  opacity: 0.1;
+}
+
+.button[data-wf--button--variant='outline']:is(:hover, :focus-visible) {
+  box-shadow: inset 0 0 0 0.5px #000;
 }
 
 .download-link {
@@ -140,6 +178,10 @@ html.is-popup-open body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .navigation:not(.is-nav-ready) {
+    visibility: visible;
+  }
+
   .section__hero[data-hero-animate]:not(.is-hero-ready) .headline-jumbo,
   .section__hero[data-hero-animate]:not(.is-hero-ready) .hero-content p,
   .section__hero[data-hero-animate]:not(.is-hero-ready) .hero__c .button,
