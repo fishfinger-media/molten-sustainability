@@ -76,23 +76,36 @@
 .download-link {
   padding-left: 0;
   padding-right: 0;
-  transition:
-    padding 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-    color 0.35s ease;
 }
 
-.download-link svg path {
-  transition: fill 0.35s ease;
+@media (hover: hover) and (pointer: fine) {
+  .download-link {
+    transition:
+      padding 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      color 0.35s ease;
+  }
+
+  .download-link svg path {
+    transition: fill 0.35s ease;
+  }
+
+  .download-link:hover {
+    padding-left: 2rem;
+    padding-right: 2rem;
+    color: #3d24e6;
+  }
+
+  .download-link:hover svg path {
+    fill: #3d24e6;
+  }
 }
 
-.download-link:hover,
 .download-link:focus-visible {
   padding-left: 2rem;
   padding-right: 2rem;
   color: #3d24e6;
 }
 
-.download-link:hover svg path,
 .download-link:focus-visible svg path {
   fill: #3d24e6;
 }

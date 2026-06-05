@@ -69,6 +69,21 @@ const BUTTON_OUT = { y: 28, opacity: 0 }
 const BUTTON_IN = { y: 0, opacity: 1, duration: 0.8, ease: 'power3.out' }
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const isMobile = window.matchMedia('(max-width: 991px)').matches
+
+function setSplitImageOut(image, imageFromRight) {
+  if (!image) return
+  gsap.set(
+    image,
+    isMobile
+      ? { x: 0, y: 40, opacity: 0, scale: 1.04 }
+      : { x: imageFromRight ? 72 : -72, y: 0, opacity: 0, scale: 1.04 },
+  )
+}
+
+const SPLIT_IMAGE_IN = isMobile
+  ? { x: 0, y: 0, opacity: 1, scale: 1, duration: 1.15, ease: 'power4.out' }
+  : { x: 0, opacity: 1, scale: 1, duration: 1.15, ease: 'power4.out' }
 
 function splitLines(el) {
   return el ? SplitText.create(el, SPLIT_LINES) : null
@@ -308,21 +323,13 @@ function initSplitSections() {
       setBodyOut(bodySplit?.lines)
       if (eyebrow) gsap.set(eyebrow, { y: 16, opacity: 0 })
       if (button) gsap.set(button, BUTTON_OUT)
-      if (image) {
-        gsap.set(image, {
-          x: imageFromRight ? 72 : -72,
-          opacity: 0,
-          scale: 1.04,
-        })
-      }
+      if (image) setSplitImageOut(image, imageFromRight)
       section.classList.remove('is-split-animated')
     }
 
     const runIn = () => {
       playIn(setOut, (tl) => {
-        if (image) {
-          tl.to(image, { x: 0, opacity: 1, scale: 1, duration: 1.15, ease: 'power4.out' }, 0)
-        }
+        if (image) tl.to(image, SPLIT_IMAGE_IN, 0)
         if (eyebrow) {
           tl.to(eyebrow, { y: 0, opacity: 1, duration: 0.75, ease: 'power3.out' }, image ? 0.18 : 0)
         }
