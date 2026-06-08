@@ -225,25 +225,21 @@ function initNavigationToggle() {
   let isOpen = false
   let toggleTween = null
 
-  const setNavList = (y, immediate = false) => {
-    toggleTween?.kill()
-    if (immediate || reducedMotion) {
-      gsap.set(navList, { y })
-      return
-    }
-    toggleTween = gsap.to(navList, {
-      y,
-      duration: 0.65,
-      ease: y === '0%' ? 'power4.out' : 'power3.inOut',
-      overwrite: 'auto',
-    })
-  }
-
-  setNavList('-100%', true)
-
   navBtn.addEventListener('click', () => {
     isOpen = !isOpen
-    setNavList(isOpen ? '0%' : '-100%')
+    const y = isOpen ? '0%' : '-100%'
+
+    toggleTween?.kill()
+    if (reducedMotion) {
+      gsap.set(navList, { y })
+    } else {
+      toggleTween = gsap.to(navList, {
+        y,
+        duration: 0.65,
+        ease: isOpen ? 'power4.out' : 'power3.inOut',
+        overwrite: 'auto',
+      })
+    }
     navBtn.classList.toggle('is-nav-active', isOpen)
     navList.classList.toggle('is-nav-open', isOpen)
   })
