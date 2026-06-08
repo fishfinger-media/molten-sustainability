@@ -1,46 +1,60 @@
-.navigation:not(.is-nav-ready) {
-  visibility: hidden;
-}
+/* Hide animated content until JS marks sections ready (not applied when reduced motion) */
+@media (prefers-reduced-motion: no-preference) {
+  .navigation:not(.is-nav-ready),
 
-.section__hero[data-hero-animate]:not(.is-hero-ready) .headline-jumbo,
-.section__hero[data-hero-animate]:not(.is-hero-ready) .hero-content p,
-.section__hero[data-hero-animate]:not(.is-hero-ready) .hero__c .button {
-  visibility: hidden;
-}
+  .section__hero[data-hero-animate]:not(.is-hero-ready) :is(
+    .headline-jumbo,
+    .hero-content p,
+    .hero__c .button
+  ),
 
-.stats-track[data-stats-animate]:not(.is-stats-headline-ready) .headline-4,
-.stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="main"],
-.stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="info"] {
-  visibility: hidden;
-}
+  .stats-track[data-stats-animate]:not(.is-stats-headline-ready) .headline-4,
+  .stats-track[data-stats-animate]:not(.is-stats-ready) :is(
+    [data-stat='main'],
+    [data-stat='info']
+  ),
 
-.section__stats:not(.is-stats-dots-ready) .stats-dots-w {
-  visibility: hidden;
-}
+  .section__stats:not(.is-stats-dots-ready) .stats-dots-w,
 
-.section__split[data-split-animate]:not(.is-split-ready) .split-image,
-.section__split[data-split-animate]:not(.is-split-ready) .split-content__c .paragraph-large,
-.section__split[data-split-animate]:not(.is-split-ready) .split-content__c .headline-4,
-.section__split[data-split-animate]:not(.is-split-ready) .split-content__c > p,
-.section__split[data-split-animate]:not(.is-split-ready) .split-content__c .button {
-  visibility: hidden;
-}
+  .section__split[data-split-animate]:not(.is-split-ready) :is(
+    .split-image,
+    .split-content__c .paragraph-large,
+    .split-content__c .headline-4,
+    .split-content__c > p,
+    .split-content__c .button
+  ),
 
-.section__split-chart:not(.is-split-ready) .split-chart-c h2,
-.section__split-chart:not(.is-split-ready) .split-chart-c p,
-.section__split-chart:not(.is-split-ready) .chart-bar_w {
-  visibility: hidden;
-}
+  .section__split-chart:not(.is-split-ready) :is(
+    .split-chart-c h2,
+    .split-chart-c p,
+    .chart-bar_w
+  ),
 
-.section__chart:not(.is-chart-ready) .gap-1 h2,
-.section__chart:not(.is-chart-ready) .gap-1 p,
-.section__chart:not(.is-chart-ready) .chart-grid > div {
-  visibility: hidden;
-}
+  .section__chart:not(.is-chart-ready) :is(
+    .gap-1 h2,
+    .gap-1 p,
+    .chart-grid > div
+  ),
 
-.section__downloads:not(.is-downloads-ready) .gap-1 h2,
-.section__downloads:not(.is-downloads-ready) .download-link {
-  visibility: hidden;
+  .section__downloads:not(.is-downloads-ready) :is(
+    .gap-1 h2,
+    .download-link
+  ),
+
+  .section__quote[data-quote-animate]:not(.is-quote-ready) :is(
+    .flex-centred.gap-1 h2,
+    .headline-1,
+    .carousel-c,
+    .glow-w
+  ),
+
+  .section__cta[data-cta-animate]:not(.is-cta-ready) :is(
+    .flex-centred.gap-1 h2,
+    .headline-1,
+    .button
+  ) {
+    visibility: hidden;
+  }
 }
 
 .button {
@@ -78,8 +92,7 @@
 }
 
 .download-link {
-  padding-left: 0;
-  padding-right: 0;
+  padding-inline: 0;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -94,8 +107,7 @@
   }
 
   .download-link:hover {
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-inline: 2rem;
     color: #3d24e6;
   }
 
@@ -105,26 +117,12 @@
 }
 
 .download-link:focus-visible {
-  padding-left: 2rem;
-  padding-right: 2rem;
+  padding-inline: 2rem;
   color: #3d24e6;
 }
 
 .download-link:focus-visible svg path {
   fill: #3d24e6;
-}
-
-.section__quote[data-quote-animate]:not(.is-quote-ready) .flex-centred.gap-1 h2,
-.section__quote[data-quote-animate]:not(.is-quote-ready) .headline-1,
-.section__quote[data-quote-animate]:not(.is-quote-ready) .carousel-c,
-.section__quote[data-quote-animate]:not(.is-quote-ready) .glow-w {
-  visibility: hidden;
-}
-
-.section__cta[data-cta-animate]:not(.is-cta-ready) .flex-centred.gap-1 h2,
-.section__cta[data-cta-animate]:not(.is-cta-ready) .headline-1,
-.section__cta[data-cta-animate]:not(.is-cta-ready) .button {
-  visibility: hidden;
 }
 
 .section__quote {
@@ -143,26 +141,6 @@
   top: 50%;
   z-index: 0;
   pointer-events: none;
-}
-
-/* Portaled to body on open so position:fixed is not trapped by grid/GSAP ancestors */
-.popup-w[data-portaled='true'] {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--_utility---page-padding);
-  overflow: hidden;
-}
-
-/* Scroll long popup content; page scroll stays locked via lenis.stop() + data-lenis-prevent */
-.popup-w[data-portaled='true'] .popup-c {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
 }
 
 .section__quote .glow-w .glow {
@@ -190,56 +168,22 @@
   inset: 0%;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .navigation:not(.is-nav-ready) {
-    visibility: visible;
-  }
+/* Portaled to body on open so position:fixed is not trapped by grid/GSAP ancestors */
+.popup-w[data-portaled='true'] {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--_utility---page-padding);
+  overflow: hidden;
+}
 
-  .section__hero[data-hero-animate]:not(.is-hero-ready) .headline-jumbo,
-  .section__hero[data-hero-animate]:not(.is-hero-ready) .hero-content p,
-  .section__hero[data-hero-animate]:not(.is-hero-ready) .hero__c .button,
-  .stats-track[data-stats-animate]:not(.is-stats-headline-ready) .headline-4,
-  .stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="main"],
-  .stats-track[data-stats-animate]:not(.is-stats-ready) [data-stat="info"],
-  .section__stats:not(.is-stats-dots-ready) .stats-dots-w {
-    visibility: visible;
-  }
-
-  .section__split[data-split-animate]:not(.is-split-ready) .split-image,
-  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c .paragraph-large,
-  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c .headline-4,
-  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c > p,
-  .section__split[data-split-animate]:not(.is-split-ready) .split-content__c .button {
-    visibility: visible;
-  }
-
-  .section__split-chart:not(.is-split-ready) .split-chart-c h2,
-  .section__split-chart:not(.is-split-ready) .split-chart-c p,
-  .section__split-chart:not(.is-split-ready) .chart-bar_w {
-    visibility: visible;
-  }
-
-  .section__chart:not(.is-chart-ready) .gap-1 h2,
-  .section__chart:not(.is-chart-ready) .gap-1 p,
-  .section__chart:not(.is-chart-ready) .chart-grid > div {
-    visibility: visible;
-  }
-
-  .section__downloads:not(.is-downloads-ready) .gap-1 h2,
-  .section__downloads:not(.is-downloads-ready) .download-link {
-    visibility: visible;
-  }
-
-  .section__quote[data-quote-animate]:not(.is-quote-ready) .flex-centred.gap-1 h2,
-  .section__quote[data-quote-animate]:not(.is-quote-ready) .headline-1,
-  .section__quote[data-quote-animate]:not(.is-quote-ready) .carousel-c,
-  .section__quote[data-quote-animate]:not(.is-quote-ready) .glow-w {
-    visibility: visible;
-  }
-
-  .section__cta[data-cta-animate]:not(.is-cta-ready) .flex-centred.gap-1 h2,
-  .section__cta[data-cta-animate]:not(.is-cta-ready) .headline-1,
-  .section__cta[data-cta-animate]:not(.is-cta-ready) .button {
-    visibility: visible;
-  }
+/* Scroll long popup content; page scroll stays locked via lenis.stop() + data-lenis-prevent */
+.popup-w[data-portaled='true'] .popup-c {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }

@@ -217,6 +217,38 @@ function initNavigationEntrance() {
     .to(nav, { opacity: 1, duration: 1.35, ease: 'power2.out' }, 0)
 }
 
+function initNavigationToggle() {
+  const navBtn = document.querySelector('.nav-btn')
+  const navList = document.querySelector('.navigation-list')
+  if (!navBtn || !navList) return
+
+  let isOpen = false
+  let toggleTween = null
+
+  const setNavList = (y, immediate = false) => {
+    toggleTween?.kill()
+    if (immediate || reducedMotion) {
+      gsap.set(navList, { y })
+      return
+    }
+    toggleTween = gsap.to(navList, {
+      y,
+      duration: 0.65,
+      ease: y === '0%' ? 'power4.out' : 'power3.inOut',
+      overwrite: 'auto',
+    })
+  }
+
+  setNavList('-100%', true)
+
+  navBtn.addEventListener('click', () => {
+    isOpen = !isOpen
+    setNavList(isOpen ? '0%' : '-100%')
+    navBtn.classList.toggle('is-nav-active', isOpen)
+    navList.classList.toggle('is-nav-open', isOpen)
+  })
+}
+
 function initHeroEntrance() {
   const hero = document.querySelector('.section__hero')
   if (!hero) return
@@ -1070,6 +1102,7 @@ function initButtonHovers() {
 function init() {
   initButtonHovers()
   initNavigationEntrance()
+  initNavigationToggle()
   initHeroEntrance()
   initSectionBodyColors()
   initSplitSections()
