@@ -145,11 +145,6 @@
   pointer-events: none;
 }
 
-html.is-popup-open,
-html.is-popup-open body {
-  overflow: hidden;
-}
-
 /* Portaled to body on open so position:fixed is not trapped by grid/GSAP ancestors */
 .popup-w[data-portaled='true'] {
   position: fixed;
@@ -162,8 +157,9 @@ html.is-popup-open body {
   overflow: hidden;
 }
 
-/* Scroll long popup content; page scroll stays locked via html.is-popup-open + Lenis */
+/* Scroll long popup content; page scroll stays locked via lenis.stop() + data-lenis-prevent */
 .popup-w[data-portaled='true'] .popup-c {
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
