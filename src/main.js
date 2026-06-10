@@ -3,40 +3,14 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { SplitText } from 'gsap/SplitText'
 import Lenis from 'lenis'
 
+gsap.registerPlugin(ScrollTrigger, SplitText)
+
 const lenis = new Lenis({
-  autoRaf: false,
+  autoRaf: true,
   allowNestedScroll: true,
 })
 
-gsap.registerPlugin(ScrollTrigger, SplitText)
-
 lenis.on('scroll', ScrollTrigger.update)
-
-gsap.ticker.add((time) => {
-  lenis.raf(time * 1000)
-})
-gsap.ticker.lagSmoothing(0)
-
-ScrollTrigger.scrollerProxy(document.documentElement, {
-  scrollTop(value) {
-    if (arguments.length) {
-      lenis.scrollTo(value, { immediate: true })
-    }
-    return lenis.scroll
-  },
-  getBoundingClientRect() {
-    return {
-      top: 0,
-      left: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    }
-  },
-})
-
-ScrollTrigger.addEventListener('refresh', () => {
-  lenis.resize()
-})
 
 // ─── Shared animation presets ───────────────────────────────────────────────
 
@@ -515,6 +489,7 @@ function initChartSections() {
 function initCardPopups() {
   const cardPopups = new WeakMap()
   const popupToCard = new WeakMap()
+  const sectionPopups = new Map()
 
   document.querySelectorAll('.card-w').forEach((card) => {
     const popupWrap = card.querySelector('.popup-w')
@@ -529,17 +504,130 @@ function initCardPopups() {
     }
   })
 
+  document.querySelectorAll('.section__chart').forEach((section) => {
+    const popups = [...section.querySelectorAll('.chart-grid > .card-w')]
+      .map((card) => cardPopups.get(card))
+      .filter(Boolean)
+
+    if (popups.length > 1) sectionPopups.set(section, popups)
+  })
+
   let activePopup = null
   let popupTimeline = null
   let isClosing = false
 
   const panelVisible = { y: 0, opacity: 1, scale: 1, filter: 'blur(0px)' }
   const panelHidden = { y: 56, opacity: 0, scale: 0.96, filter: 'blur(14px)' }
+  const navVisible = { opacity: 1 }
+  const navHidden = { opacity: 0 }
+
+  const getPopupNavTargets = (popupWrap) => {
+    const nav = popupWrap.querySelector('.popup-nav')
+    if (nav) return [nav]
+    return [...popupWrap.querySelectorAll('.previous, .next')]
+  }
 
   const setScrollLocked = (locked) => {
     document.documentElement.classList.toggle('is-popup-open', locked)
     if (locked) lenis.stop()
     else lenis.start()
+  }
+
+  const getPopupSection = (popupWrap) => {
+    const card = popupToCard.get(popupWrap)
+    return card?.closest('.section__chart') ?? null
+  }
+
+  const updatePopupNav = (popupWrap) => {
+    if (!popupWrap) return
+
+    const popups = sectionPopups.get(getPopupSection(popupWrap))
+    const prevBtn = popupWrap.querySelector('.previous')
+    const nextBtn = popupWrap.querySelector('.next')
+
+    if (!prevBtn && !nextBtn) return
+
+    if (!popups?.includes(popupWrap)) {
+      prevBtn?.setAttribute('hidden', '')
+      nextBtn?.setAttribute('hidden', '')
+      return
+    }
+
+    prevBtn?.removeAttribute('hidden')
+    nextBtn?.removeAttribute('hidden')
+    if (prevBtn) prevBtn.disabled = false
+    if (nextBtn) nextBtn.disabled = false
+  }
+
+  const preparePopupNav = (popupWrap) => {
+    updatePopupNav(popupWrap)
+    const targets = getPopupNavTargets(popupWrap)
+    if (targets.length) gsap.set(targets, navHidden)
+    return targets
+  }
+
+  const switchPopup = (targetPopupWrap) => {
+    if (!activePopup || activePopup === targetPopupWrap || isClosing) return
+
+    popupTimeline?.kill()
+
+    const prevPopup = activePopup
+    const prevPanel = prevPopup.querySelector('.popup')
+    const nextPanel = targetPopupWrap.querySelector('.popup')
+
+    const finishSwitch = () => {
+      resetPopupStyles(prevPopup)
+      prevPopup.style.display = 'none'
+      unportalPopup(prevPopup)
+
+      portalPopup(targetPopupWrap)
+      targetPopupWrap.style.display = 'flex'
+      activePopup = targetPopupWrap
+
+      const scrollArea = targetPopupWrap.querySelector('.popup-c')
+      if (scrollArea) scrollArea.scrollTop = 0
+
+      gsap.set(targetPopupWrap, { backgroundColor: 'rgba(0, 0, 0, 0.35)' })
+      updatePopupNav(targetPopupWrap)
+
+      const nextNav = getPopupNavTargets(targetPopupWrap)
+      if (nextNav.length) gsap.set(nextNav, navVisible)
+
+      if (!nextPanel || reducedMotion) {
+        gsap.set(nextPanel, panelVisible)
+        return
+      }
+
+      gsap.set(nextPanel, panelHidden)
+      popupTimeline = gsap
+        .timeline({ defaults: { ease: 'power3.out' } })
+        .to(nextPanel, { ...panelVisible, duration: 0.5 })
+    }
+
+    if (!prevPanel || reducedMotion) {
+      finishSwitch()
+      return
+    }
+
+    popupTimeline = gsap
+      .timeline({ defaults: { ease: 'power3.in' } })
+      .to(prevPanel, { ...panelHidden, duration: 0.28 })
+      .add(finishSwitch)
+  }
+
+  const navigatePopup = (direction) => {
+    if (!activePopup) return
+
+    const popups = sectionPopups.get(getPopupSection(activePopup))
+    if (!popups) return
+
+    const index = popups.indexOf(activePopup)
+    const targetIndex =
+      direction === 'next'
+        ? (index + 1) % popups.length
+        : (index - 1 + popups.length) % popups.length
+
+    switchPopup(popups[targetIndex])
   }
 
   const portalPopup = (popupWrap) => {
@@ -557,7 +645,8 @@ function initCardPopups() {
 
   const resetPopupStyles = (popupWrap) => {
     const panel = popupWrap.querySelector('.popup')
-    gsap.set([popupWrap, panel].filter(Boolean), { clearProps: 'all' })
+    const navTargets = getPopupNavTargets(popupWrap)
+    gsap.set([popupWrap, panel, ...navTargets].filter(Boolean), { clearProps: 'all' })
   }
 
   const finishClose = (popupWrap, onComplete) => {
@@ -579,6 +668,7 @@ function initCardPopups() {
 
     popupTimeline?.kill()
     const panel = popupWrap.querySelector('.popup')
+    const navTargets = getPopupNavTargets(popupWrap)
 
     if (!panel || reducedMotion) {
       finishClose(popupWrap, onComplete)
@@ -593,6 +683,7 @@ function initCardPopups() {
         onComplete: () => finishClose(popupWrap, onComplete),
       })
       .to(panel, { ...panelHidden, duration: 0.42 }, 0)
+      .to(navTargets, { ...navHidden, duration: 0.3, ease: 'power2.in' }, 0.04)
       .to(
         popupWrap,
         { backgroundColor: 'rgba(0, 0, 0, 0)', duration: 0.38, ease: 'power2.in' },
@@ -604,6 +695,12 @@ function initCardPopups() {
     if (activePopup === popupWrap) return
 
     if (activePopup && activePopup !== popupWrap) {
+      const popups = sectionPopups.get(getPopupSection(popupWrap))
+      if (popups?.includes(popupWrap) && popups.includes(activePopup)) {
+        switchPopup(popupWrap)
+        return
+      }
+
       closePopup(activePopup, () => openPopup(popupWrap))
       return
     }
@@ -613,14 +710,22 @@ function initCardPopups() {
     activePopup = popupWrap
     setScrollLocked(true)
 
+    const scrollArea = popupWrap.querySelector('.popup-c')
+    if (scrollArea) scrollArea.scrollTop = 0
+
     const panel = popupWrap.querySelector('.popup')
     popupTimeline?.kill()
 
     if (!panel || reducedMotion) {
       gsap.set(popupWrap, { backgroundColor: 'rgba(0, 0, 0, 0.35)' })
       gsap.set(panel, panelVisible)
+      updatePopupNav(popupWrap)
+      const navTargets = getPopupNavTargets(popupWrap)
+      if (navTargets.length) gsap.set(navTargets, navVisible)
       return
     }
+
+    const navTargets = preparePopupNav(popupWrap)
 
     gsap.set(popupWrap, { backgroundColor: 'rgba(0, 0, 0, 0)' })
     gsap.set(panel, panelHidden)
@@ -633,6 +738,7 @@ function initCardPopups() {
         0,
       )
       .to(panel, { ...panelVisible, duration: 0.7 }, 0.1)
+      .to(navTargets, { ...navVisible, duration: 0.45, ease: 'power2.out' }, 0.35)
   }
 
   document.addEventListener('click', (event) => {
@@ -647,6 +753,18 @@ function initCardPopups() {
 
     if (event.target.closest('.popup-btn_close')) {
       closePopup(event.target.closest('.popup-w'))
+      return
+    }
+
+    if (event.target.closest('.previous')) {
+      event.preventDefault()
+      navigatePopup('previous')
+      return
+    }
+
+    if (event.target.closest('.next')) {
+      event.preventDefault()
+      navigatePopup('next')
       return
     }
 
@@ -1095,6 +1213,19 @@ function initButtonHovers() {
   })
 }
 
+gsap.from('.skip-btn', {
+  x: 40,
+  opacity: 0,
+  duration: 0.85,
+  ease: 'power3.out',
+  scrollTrigger: {
+    trigger: '.section__stats',
+    start: 'top 20%',
+    end: 'bottom 70%',
+    toggleActions: 'play reverse play reverse',
+  },
+})
+
 function init() {
   initButtonHovers()
   initNavigationEntrance()
@@ -1117,3 +1248,4 @@ if (document.fonts?.ready) {
 } else {
   init()
 }
+
